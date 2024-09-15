@@ -365,9 +365,12 @@ class FileGatherer {
 
   // Tally up findings for files of interest and assemble in one file.
   // (BuildWorkList() needs to be called first).
-  std::map<std::string, int> CreateReport(const fs::path &project_dir,
-                                          std::string_view symlink_to) {
+  size_t CreateReport(const fs::path &project_dir,
+                      std::string_view symlink_detail,
+                      std::string_view symlink_summary) {
     const fs::path tidy_outfile = project_dir / "tidy.out";
+    const fs::path tidy_summary = project_dir / "tidy-summary.out";
+
     // Assemble the separate outputs into a single file. Tally up per-check
     const std::regex check_re("(\\[[a-zA-Z.-]+\\])\n");
     std::map<std::string, int> checks_seen;
@@ -381,9 +384,26 @@ class FileGatherer {
     }
 
     std::error_code ignored_error;
-    fs::remove(symlink_to, ignored_error);
-    fs::create_symlink(tidy_outfile, symlink_to, ignored_error);
-    return checks_seen;
+    fs::remove(symlink_detail, ignored_error);
+    fs::create_symlink(tidy_outfile, symlink_detail, ignored_error);
+
+    using check_count_t = std::pair<std::string, int>;
+    std::vector<check_count_t> by_count(checks_seen.begin(), checks_seen.end());
+    std::stable_sort(by_count.begin(), by_count.end(),
+                     [](const check_count_t &a, const check_count_t &b) {
+                       return b.second < a.second;  // reverse count
+                     });
+    FILE *summary_file = fopen(tidy_summary.c_str(), "wb");
+    for (const auto &counts : by_count) {
+      fprintf(stdout, "%5d %s\n", counts.second, counts.first.c_str());
+      fprintf(summary_file, "%5d %s\n", counts.second, counts.first.c_str());
+    }
+    fclose(summary_file);
+
+    fs::remove(symlink_summary, ignored_error);
+    fs::create_symlink(tidy_summary, symlink_summary, ignored_error);
+
+    return checks_seen.size();
   }
 
  private:
@@ -432,23 +452,18 @@ int main(int argc, char *argv[]) {
   // Now the expensive part...
   runner.RunClangTidyOn(store, &work_list);
 
-  const std::string kTidySymlink = cache_prefix + "clang-tidy.out";
-  auto checks_seen =
-    cc_file_gatherer.CreateReport(runner.project_cache_dir(), kTidySymlink);
+  const std::string detailed_report = cache_prefix + "clang-tidy.out";
+  const std::string summary = cache_prefix + "clang-tidy.summary";
+  size_t checks_seen = cc_file_gatherer.CreateReport(runner.project_cache_dir(),
+                                                     detailed_report, summary);
 
-  if (checks_seen.empty()) {
+  if (!checks_seen) {
     std::cerr << "No clang-tidy complaints. 😎\n";
   } else {
-    std::cerr << "--- Summary --- (details in " << kTidySymlink << ")\n";
-    using check_count_t = std::pair<std::string, int>;
-    std::vector<check_count_t> by_count(checks_seen.begin(), checks_seen.end());
-    std::stable_sort(by_count.begin(), by_count.end(),
-                     [](const check_count_t &a, const check_count_t &b) {
-                       return b.second < a.second;  // reverse count
-                     });
-    for (const auto &counts : by_count) {
-      fprintf(stdout, "%5d %s\n", counts.second, counts.first.c_str());
-    }
+    std::cerr << "This Summary   : " << summary << "\n"
+              << "Detailed report: " << detailed_report << "\n";
+
   }
-  return checks_seen.empty() ? EXIT_SUCCESS : EXIT_FAILURE;
+
+  return checks_seen == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
