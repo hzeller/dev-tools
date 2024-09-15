@@ -11,11 +11,15 @@ PR_FILES_BASENAME=pr-files.json
 
 if [ $# -ne 2 ]; then
     echo "usage: $0 <owner> <repo>"
-    exit
+    exit 1
 fi
 
 OWNER=$1
 REPO=$2
+
+function log() {
+    echo $@ 1>&2
+}
 
 function call_gh_api() {
     gh api -F per_page=1000 \
@@ -28,7 +32,7 @@ function call_gh_api() {
 PR_LIST=/tmp/${OWNER}-${REPO}-${PR_LIST_BASENAME}
 
 if [ "${UPDATE_ALL_FILES}" -eq 1 -o ! -r "${PR_LIST}" ]; then
-    echo "Fetching ${PR_LIST}"
+    log "Fetching ${PR_LIST}"
     call_gh_api pulls > "${PR_LIST}"
 fi
 
@@ -38,7 +42,7 @@ OPEN_PRS=$(jq  ".[] | .number" ${PR_LIST})
 for PR in ${OPEN_PRS}; do
     PR_FILES=/tmp/${OWNER}-${REPO}-${PR}-${PR_FILES_BASENAME}
     if [ "${UPDATE_ALL_FILES}" -eq 1 -o ! -r "${PR_FILES}" ]; then
-	echo "Fetching ${PR_FILES}"
+	log "Fetching ${PR_FILES}"
 	call_gh_api "pulls/${PR}/files" > "${PR_FILES}"
     fi
 done
