@@ -85,12 +85,13 @@ static constexpr bool kRevisitBrokenFilesIfCompilationDBNewer = true;
 
 // Files to be considered.
 inline bool ConsiderExtension(const std::string &extension) {
-  return extension == ".cc" || extension == ".h";
+  return extension == ".cc" || extension == ".cpp" || extension == ".h";
 }
 
 // Configuration of clang-tidy itself.
 static constexpr std::string_view kClangConfigFile = ".clang-tidy";
-static constexpr std::string_view kExtraArgs[] = {"-Wno-unknown-pragmas"};
+static constexpr std::string_view kExtraArgs[] = {
+    "-Wno-unknown-pragmas", "-Wno-unknown-warning-option"};
 
 namespace {
 
