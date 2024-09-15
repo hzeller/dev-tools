@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Needs tools: gh, jq
+
+# Note: might need to gh auth first
+
+# if 1, always update files from github API, otherwise re-use if cached
+UPDATE_ALL_FILES=0
+
+PR_LIST_BASENAME=list-of-prs.json
+PR_FILES_BASENAME=pr-files.json
+
+if [ $# -ne 2 ]; then
+    echo "usage: $0 <owner> <repo>"
+    exit
+fi
+
+OWNER=$1
+REPO=$2
+
+function call_gh_api() {
+    gh api -F per_page=1000 \
+       --header 'Accept: application/vnd.github+json'\
+       --header 'X-GitHub-Api-Version: 2022-11-28'\
+       --method=GET /repos/${OWNER}/${REPO}/$1
+}
+
+
+PR_LIST=/tmp/${OWNER}-${REPO}-${PR_LIST_BASENAME}
+
+if [ "${UPDATE_ALL_FILES}" -eq 1 -o ! -r "${PR_LIST}" ]; then
+    echo "Fetching ${PR_LIST}"
+    call_gh_api pulls > "${PR_LIST}"
+fi
+
+# Extract the numbers of the currently open PRs
+OPEN_PRS=$(jq  ".[] | .number" ${PR_LIST})
+
+for PR in ${OPEN_PRS}; do
+    PR_FILES=/tmp/${OWNER}-${REPO}-${PR}-${PR_FILES_BASENAME}
+    if [ "${UPDATE_ALL_FILES}" -eq 1 -o ! -r "${PR_FILES}" ]; then
+	echo "Fetching ${PR_FILES}"
+	call_gh_api "pulls/${PR}/files" > "${PR_FILES}"
+    fi
+done
+
+# All open files, uniquified.
+jq -r ".[] | .filename" "/tmp/${OWNER}-${REPO}-"*"-${PR_FILES_BASENAME}" \
+    | sort | uniq

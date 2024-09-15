@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+if [ $# -ne 1 ]; then
+  echo -e "usage: $0 feature-branch-name"
+  exit 1
+fi
+
+PREFIX=$(date +%Y%m%d)
+
+git checkout -b "feature-${PREFIX}-$1"

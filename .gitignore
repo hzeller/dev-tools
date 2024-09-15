@@ -1,0 +1,6 @@
+*~
+.envrc
+.direnv
+
+# Compiled version of run-clang-tidy-cached.cc
+run-clang-tidy-cached

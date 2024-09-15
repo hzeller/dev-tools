@@ -1,0 +1,9 @@
+Some random tools and scripts that I use in various development.
+Decentral git backup :) Might or might not be useful to others.
+
+  * git-sync-upstream : sync a fork to the upstream repo.
+  * git-new-feature   : create a new branch with date and short feature name
+  * git-open-pr-files : find all the files that are currently open in PRs on GH
+  * run-clang-tidy-cached.cc : Run clang-tidy in parallel on project and cache
+            results to speed up the pretty slow clang-tidy processing runtime.
+	    A c++ program that can be invoked as a 'script' (self-compiles).

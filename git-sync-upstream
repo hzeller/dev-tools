@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Of course, requires a
+#    git remote add upstream <url>
+# first
+set -e
+
+MAIN_BRANCH=$(git remote set-head origin --auto | awk '{print $4}')
+
+git pull
+if git fetch upstream; then
+    git checkout $MAIN_BRANCH
+    git merge upstream/$MAIN_BRANCH
+    git push
+
+    # While at it.
+    git submodule update --init --recursive
+else
+    echo -e "\nYou need to first"
+    echo "  git remote add upstream <url>"
+fi
