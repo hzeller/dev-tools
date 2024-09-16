@@ -337,7 +337,11 @@ class FileGatherer {
       // Remember content hash of header, so that we can make changed headers
       // influence the hash of a file including this.
       if (extension == ".h") {
-        header_hashes[file] = hashContent(GetContent(p));
+        // Since the files might be included sloppily without prefix path,
+        // just keep track of the basename (but since there might be collisions,
+        // accomodate all of them by xor-ing the hashes).
+        const std::string just_basename = fs::path(file).filename();
+        header_hashes[just_basename] ^= hashContent(GetContent(p));
       }
     }
     std::cerr << files_of_interest_.size() << " files of interest.\n";
@@ -353,7 +357,8 @@ class FileGatherer {
       for (ReIt it(content.begin(), content.end(), inc_re); it != ReIt();
            ++it) {
         const std::string &header_path = (*it)[1].str();
-        f.second ^= header_hashes[header_path];
+        const std::string header_basename = fs::path(header_path).filename();
+        f.second ^= header_hashes[header_basename];
       }
       // Recreate if we don't have it yet or if it contains messages but is
       // older than WORKSPACE or compilation db. Maybe something got fixed.
