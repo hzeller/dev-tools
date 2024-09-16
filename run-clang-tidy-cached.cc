@@ -460,8 +460,8 @@ int main(int argc, char *argv[]) {
 
   const std::string detailed_report = cache_prefix + "clang-tidy.out";
   const std::string summary = cache_prefix + "clang-tidy.summary";
-  size_t checks_seen = cc_file_gatherer.CreateReport(runner.project_cache_dir(),
-                                                     detailed_report, summary);
+  const size_t checks_seen = cc_file_gatherer.CreateReport(
+      runner.project_cache_dir(), detailed_report, summary);
 
   if (!checks_seen) {
     std::cerr << "No clang-tidy complaints. 😎\n";
