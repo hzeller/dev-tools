@@ -67,12 +67,12 @@ struct ConfigValues {
   // Some projects need e.g. "src/".
   std::string_view start_dir;
 
-  // Regular expression matching files that should be included from file list.
+  // Regular expression matching files that should be included in file list.
   std::string_view file_include_re = ".*";
 
   // Regular expxression matching files that should be excluded from file list.
-  // If overriding, make sure to include at least ".git".
-  std::string_view file_exclude_re = ".git/|.github/";
+  // If searching from toplevel, make sure to include at least ".git/".
+  std::string_view file_exclude_re = "^(\\.git|\\.github|build)/";
 
   // A file in the toplevel of the project that should exist, typically
   // something used to set up the build environment, such as MODULE.bazel,
@@ -93,6 +93,14 @@ struct ConfigValues {
   // few problematic sources to begin with, otherwise every update of the
   // compilation DB will re-trigger revisiting all of them.
   bool revisit_brokenfiles_if_build_config_newer = true;
+
+  // Revisit a source file if any of its include files changed content. Say
+  // foo.cc includes bar.h. Reprocess foo.cc with clang-tidy when bar.h changed,
+  // even if foo.cc is unchanged. This will find issues in which foo.cc relies
+  // on something bar.h provides.
+  // Usually good to keep on, but it can result in situations in which a header
+  // that is included by a lot of other files results in lots of reprocessing.
+  bool revisit_if_any_include_changes = true;
 };
 
 // --------------[ Project-specific configuration ]--------------
@@ -105,9 +113,20 @@ static constexpr ConfigValues kConfig = {
 };
 // --------------------------------------------------------------
 
-// Files to be considered.
+// Files that look like relevant include files.
+inline bool IsIncludeExtension(const std::string &extension) {
+  for (std::string_view e : {".h", ".hpp", ".hxx", ".inl"}) {
+    if (extension == e) return true;
+  }
+  return false;
+}
+
+// Filter for source files to be considered.
 inline bool ConsiderExtension(const std::string &extension) {
-  return extension == ".cc" || extension == ".cpp" || extension == ".h";
+  for (std::string_view e : {".cc", ".cpp"}) {
+    if (extension == e) return true;
+  }
+  return IsIncludeExtension(extension);
 }
 
 // Configuration of clang-tidy itself.
@@ -360,34 +379,41 @@ class FileGatherer {
       }
       // Remember content hash of header, so that we can make changed headers
       // influence the hash of a file including this.
-      if (extension == ".h") {
+      if (kConfig.revisit_if_any_include_changes &&
+          IsIncludeExtension(extension)) {
         // Since the files might be included sloppily without prefix path,
         // just keep track of the basename (but since there might be collisions,
         // accomodate all of them by xor-ing the hashes).
-        const std::string just_basename = fs::path(file).filename();
+        const std::string just_basename = p.filename();
         header_hashes[just_basename] ^= hashContent(GetContent(p));
       }
     }
     std::cerr << files_of_interest_.size() << " files of interest.\n";
 
-    // Create content hash address. If any header a file depends on changes, we
-    // want to reprocess. So we make the hash dependent on header content as
-    // well.
+    // Create content hash address for the cache and build list of work items.
+    // If we want to revisit if headers changed, make hash dependent on them.
     std::list<filepath_contenthash_t> work_queue;
-    const std::regex inc_re("\"([0-9a-zA-Z_/-]+\\.h)\"");  // match include
-    for (filepath_contenthash_t &f : files_of_interest_) {
-      const auto content = GetContent(f.first);
-      f.second = hashContent(content);
-      for (ReIt it(content.begin(), content.end(), inc_re); it != ReIt();
-           ++it) {
-        const std::string &header_path = (*it)[1].str();
-        const std::string header_basename = fs::path(header_path).filename();
-        f.second ^= header_hashes[header_basename];
+    const std::regex inc_re(
+        R"""(#\s*include\s+"([0-9a-zA-Z_/-]+\.[a-zA-Z]+)")""");
+    for (filepath_contenthash_t &work_file : files_of_interest_) {
+      const auto content = GetContent(work_file.first);
+      work_file.second = hashContent(content);
+      if (kConfig.revisit_if_any_include_changes) {
+        // Update the hash with all the hashes from all include files.
+        for (ReIt it(content.begin(), content.end(), inc_re); it != ReIt();
+             ++it) {
+          const std::string &header_path = (*it)[1].str();
+          const std::string header_basename = fs::path(header_path).filename();
+          const auto found = header_hashes.find(header_basename);
+          if (found != header_hashes.end()) {
+            work_file.second ^= found->second;
+          }
+        }
       }
-      // Recreate if we don't have it yet or if it contains messages but is
-      // older than WORKSPACE or compilation db. Maybe something got fixed.
-      if (store_.NeedsRefresh(f, min_freshness)) {
-        work_queue.emplace_back(f);
+      // Recreate if we don't have it yet or if it contains findings but is
+      // older than build environment. Maybe something got fixed: revisit file.
+      if (store_.NeedsRefresh(work_file, min_freshness)) {
+        work_queue.emplace_back(work_file);
       }
     }
     return work_queue;
