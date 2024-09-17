@@ -373,7 +373,7 @@ class FileGatherer {
   // (BuildWorkList() needs to be called first).
   size_t CreateReport(const fs::path &project_dir,
                       std::string_view symlink_detail,
-                      std::string_view symlink_summary) {
+                      std::string_view symlink_summary) const {
     const fs::path tidy_outfile = project_dir / "tidy.out";
     const fs::path tidy_summary = project_dir / "tidy-summary.out";
 
@@ -388,17 +388,28 @@ class FileGatherer {
         checks_seen[(*it)[1].str()]++;
       }
     }
-
+    tidy_collect.close();
     std::error_code ignored_error;
     fs::remove(symlink_detail, ignored_error);
     fs::create_symlink(tidy_outfile, symlink_detail, ignored_error);
 
+    // Report headline.
+    if (checks_seen.size() > 0) {
+      std::cerr << "Details: " << symlink_detail << "\n"
+                << "Summary: " << symlink_summary << "\n";
+      std::cerr << "---- Summary ----\n";
+    } else {
+      std::cerr << "No clang-tidy complaints. 😎\n";
+    }
+
+    // Produce a ordered-by-count report.
     using check_count_t = std::pair<std::string, int>;
     std::vector<check_count_t> by_count(checks_seen.begin(), checks_seen.end());
     std::stable_sort(by_count.begin(), by_count.end(),
                      [](const check_count_t &a, const check_count_t &b) {
                        return b.second < a.second;  // reverse count
                      });
+
     FILE *summary_file = fopen(tidy_summary.c_str(), "wb");
     for (const auto &counts : by_count) {
       fprintf(stdout, "%5d %s\n", counts.second, counts.first.c_str());
@@ -460,16 +471,8 @@ int main(int argc, char *argv[]) {
 
   const std::string detailed_report = cache_prefix + "clang-tidy.out";
   const std::string summary = cache_prefix + "clang-tidy.summary";
-  const size_t checks_seen = cc_file_gatherer.CreateReport(
-      runner.project_cache_dir(), detailed_report, summary);
+  const size_t tidy_count = cc_file_gatherer.CreateReport(
+    runner.project_cache_dir(), detailed_report, summary);
 
-  if (!checks_seen) {
-    std::cerr << "No clang-tidy complaints. 😎\n";
-  } else {
-    std::cerr << "This Summary   : " << summary << "\n"
-              << "Detailed report: " << detailed_report << "\n";
-
-  }
-
-  return checks_seen == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  return tidy_count == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
