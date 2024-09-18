@@ -311,6 +311,10 @@ class ClangTidyRunner {
 
     // Use major version as part of name of our configuration specific dir.
     auto version = GetCommandOutput(clang_tidy_ + " --version");
+    if (version.empty()) {
+      std::cerr << "Could not invoke '" << clang_tidy_ << "'; is it in PATH ?\n";
+      exit(EXIT_FAILURE);
+    }
     std::smatch version_match;
     const std::string major_version =
       std::regex_search(version, version_match, std::regex{"version ([0-9]+)"})
