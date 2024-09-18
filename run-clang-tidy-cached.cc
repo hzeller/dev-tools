@@ -85,6 +85,11 @@ struct ConfigValues {
   // (Default configuration: just .clang-tidy as this should always be there)
   std::string_view toplevel_build_file = ".clang-tidy";
 
+  // Bazel projects have some complicated paths where generated and external
+  // sources reside. Setting this to true will tell this script canonicalize
+  // these in the output. Set to true if this is a bazel project.
+  bool is_bazel_project = false;
+
   // If the compilation DB or toplevel_build_file changed in timestamp, it
   // might be worthwhile revisiting sources that previously had issues.
   // This flag enables that.
@@ -320,16 +325,18 @@ class ClangTidyRunner {
   }
 
   // Fix filename paths found in logfiles that are not emitted relative to
-  // project root in the log (bazel has its own, so this fixes bazel-specific
-  // projects)
+  // project root in the log - remove that prefix.
+  // (bazel has its own, so if this is bazel, also bazel-specific fix up that).
   static void RepairFilenameOccurences(const fs::path &infile,
                                        const fs::path &outfile) {
     static const std::regex sFixPathsRe = []() {
       std::string canonicalize_expr = "(^|\\n)(";  // fix names at start of line
-      auto root = GetCommandOutput("bazel info execution_root 2>/dev/null");
-      if (!root.empty()) {
-        root.pop_back();  // remove newline.
-        canonicalize_expr += root + "/|";
+      if (kConfig.is_bazel_project) {
+        auto bzroot = GetCommandOutput("bazel info execution_root 2>/dev/null");
+        if (!bzroot.empty()) {
+          bzroot.pop_back();  // remove newline.
+          canonicalize_expr += bzroot + "/|";
+        }
       }
       canonicalize_expr += fs::current_path().string() + "/";  // $(pwd)/
       canonicalize_expr +=
