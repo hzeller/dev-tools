@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools
+// Location: https://github.com/hzeller/dev-tools (2024-09-19)
 
 // Script to run clang-tidy on files in a bazel project while caching the
 // results as clang-tidy can be pretty slow. The clang-tidy output messages
@@ -61,10 +61,11 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // Dont' change anything here, override for your project below in kConfig.
 struct ConfigValues {
   // Prefix for the cache to write to. If empty, use name of toplevel directory.
+  // Typical would be name of project with underscore suffix.
   std::string_view cache_prefix;
 
   // Directory to start recurse for sources createing a file list.
-  // Some projects need e.g. "src/".
+  // Some projects e.g. start at "src/".
   std::string_view start_dir;
 
   // Regular expression matching files that should be included in file list.
@@ -120,7 +121,7 @@ static constexpr ConfigValues kConfig = {
 
 // Files that look like relevant include files.
 inline bool IsIncludeExtension(const std::string &extension) {
-  for (std::string_view e : {".h", ".hpp", ".hxx", ".inl"}) {
+  for (const std::string_view e : {".h", ".hpp", ".hxx", ".inl"}) {
     if (extension == e) return true;
   }
   return false;
@@ -128,7 +129,7 @@ inline bool IsIncludeExtension(const std::string &extension) {
 
 // Filter for source files to be considered.
 inline bool ConsiderExtension(const std::string &extension) {
-  for (std::string_view e : {".cc", ".cpp"}) {
+  for (const std::string_view e : {".cc", ".cpp", ".cxx"}) {
     if (extension == e) return true;
   }
   return IsIncludeExtension(extension);
@@ -432,11 +433,14 @@ class FileGatherer {
 
   // Tally up findings for files of interest and assemble in one file.
   // (BuildWorkList() needs to be called first).
-  size_t CreateReport(const fs::path &project_dir,
+  size_t CreateReport(const fs::path &cache_dir,
                       std::string_view symlink_detail,
                       std::string_view symlink_summary) const {
-    const fs::path tidy_outfile = project_dir / "tidy.out";
-    const fs::path tidy_summary = project_dir / "tidy-summary.out";
+    // Make it possible to keep independent reports for different invocation
+    // locations (e.g. two checkouts of the same project) using the same cache.
+    const std::string suffix = ToHex(hashContent(fs::current_path().string()));
+    const fs::path tidy_outfile = cache_dir / ("tidy.out-" + suffix);
+    const fs::path tidy_summary = cache_dir / ("tidy-summary.out-" + suffix);
 
     // Assemble the separate outputs into a single file. Tally up per-check
     const std::regex check_re("(\\[[a-zA-Z.-]+\\])\n");
