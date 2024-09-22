@@ -7,3 +7,8 @@ Decentral git backup :) Might or might not be useful to others.
   * run-clang-tidy-cached.cc : Run clang-tidy in parallel on project and cache
             results to speed up the pretty slow clang-tidy processing runtime.
 	    A c++ program that can be invoked as a 'script' (self-compiles).
+  * move-header-to-front.cc : if a particular include is found in a file,
+            move it right in front of the first include of that file if
+	    not already.
+	    Can be used to move the declaration header for an implementation
+	    to the front.
