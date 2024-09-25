@@ -16,7 +16,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-09-22)
+// Location: https://github.com/hzeller/dev-tools (2024-09-24)
 
 // Script that moves a particular include as the first header in a file.
 
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
   written += fwrite(header_to_move.data(), 1, header_to_move.size(), tmp_out);
 
   // If there was not already a double-newline after that header, add it.
-  if (header_to_move[header_to_move.size() - 2]) {
+  if (header_to_move[header_to_move.size() - 2] != '\n') {
     fwrite("\n", 1, 1, tmp_out);  // Don't add to written as it changes size.
   }
 
