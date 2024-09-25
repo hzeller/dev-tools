@@ -30,8 +30,8 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <string_view>
 
 static int usage(const char *progname) {
-  fprintf(stderr, "Usage: %s <file> <header>\n", progname);
-  fprintf(stderr, "Example\n\t%s src/foo/bar.cc foo/bar.h\n\n", progname);
+  fprintf(stderr, "Usage: %s <header> <file>\n", progname);
+  fprintf(stderr, "Example\n\t%s foo/bar.h src/foo/bar.cc\n\n", progname);
   fprintf(stderr, "If an include of #include \"foo/bar.h\" is found in "
           "src/foo/bar.cc, then it is moved before the first include.\n");
   return EXIT_FAILURE;
@@ -62,9 +62,9 @@ int main(int argc, char *argv[]) {
   if (argc != 3) {
     return usage(argv[0]);
   }
-  const std::string file_to_modify = argv[1];
   const std::string expected_include =
-    std::string("#include \"") + argv[2] + "\"";
+    std::string("#include \"") + argv[1] + "\"";
+  const std::string file_to_modify = argv[2];
 
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {

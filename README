@@ -1,9 +1,12 @@
 Some random tools and scripts that I use in various development.
 Decentral git backup :) Might or might not be useful to others.
 
+Shell scripts
   * git-sync-upstream : sync a fork to the upstream repo.
   * git-new-feature   : create a new branch with date and short feature name
   * git-open-pr-files : find all the files that are currently open in PRs on GH
+
+C++ scripts
   * run-clang-tidy-cached.cc : Run clang-tidy in parallel on project and cache
             results to speed up the pretty slow clang-tidy processing runtime.
 	    A c++ program that can be invoked as a 'script' (self-compiles).
@@ -12,3 +15,14 @@ Decentral git backup :) Might or might not be useful to others.
 	    not already.
 	    Can be used to move the declaration header for an implementation
 	    to the front.
+	    (Note: does not take #ifdefs into account, so might need manual
+	    intervention to move if not desired at the location).
+  * insert-header.cc : insert a header into file(s), if not already there.
+            Puts <>-headers before the first <>-header, others before the first
+	    "" header (if available). Other than that, does not make any
+	    attempt to sort the final headers or understand if it ended up
+	    in the right group (that is what clang-format is for :) ).
+
+
+The *.cc files are done that they act as self-compiling 'scripts'. So
+they can be invoked with e.g. ./insert-header.cc

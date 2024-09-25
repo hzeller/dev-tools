@@ -27,18 +27,26 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <iostream>
 #include <optional>
 #include <string>
-#include <string_view>
 
 static int usage(const char *progname) {
-  fprintf(stderr, "Usage: %s <file> <header>\n", progname);
-  fprintf(stderr, "Insert a header to file if not already.\n"
-          "Header can be soem simple string or bracketed with '<...>'\n"
-          "If header starts with '<', it is attempted to be inserted near\n"
-          "an angle-bracket headder\n");
+  fprintf(stderr, "Usage: %s <header> <file>...\n", progname);
+  fprintf(stderr,
+          "\tInsert a header into c/c++ file(s) if not there already.\n"
+          "\tHeader can be some simple string or bracketed with '<...>'\n"
+          "\tIf header starts with '<', it is attempted to be inserted near "
+          "an angle-bracket header\n"
+          "Example\n"
+          "\t  %s '<vector>' foo.cc bar.cc\n"
+          "\twill insert `#include <vector>` before the first angle include\n"
+          "\tinto files foo.cc and bar.cc; Similarly,\n"
+          "\t  %s 'hello/world.h' foo.cc bar.cc\n"
+          "\twill insert `#include \"hello/world.h\"` before the first quote "
+          "include.\n",
+          progname, progname);
   return EXIT_FAILURE;
 }
 
-std::optional<std::string> GetContent(FILE *f) {
+static std::optional<std::string> GetContent(FILE *f) {
   if (!f) return std::nullopt;
   std::string result;
   char buf[4096];
@@ -49,7 +57,7 @@ std::optional<std::string> GetContent(FILE *f) {
   return result;
 }
 
-std::optional<std::string> GetContent(const std::string &path) {
+static std::optional<std::string> GetContent(const std::string &path) {
   FILE *const file_to_read = fopen(path.c_str(), "rb");
   if (!file_to_read) {
     fprintf(stderr, "%s: can't open: %s\n", path.c_str(),
@@ -59,29 +67,18 @@ std::optional<std::string> GetContent(const std::string &path) {
   return GetContent(file_to_read);
 }
 
-int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    return usage(argv[0]);
-  }
-  const std::string file_to_modify = argv[1];
-  const bool is_angle_inc = argv[2][0] == '<';
-  const std::string insert_include =
-      is_angle_inc ? std::string("#include ") + argv[2]
-                   : std::string("#include \"") + argv[2] + "\"";
-  if (is_angle_inc && insert_include.back() != '>') {
-    std::cerr << "Missing '>' at include\n";
-    return EXIT_FAILURE;
-  }
-
+static bool ModifyFile(const std::string &file_to_modify,
+                       bool is_angle_inc,
+                       const std::string &insert_header) {
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {
-    return EXIT_FAILURE;
+    return false;
   }
   const std::string &content = *content_or;
 
-  if (content.find(insert_include) != std::string::npos) {
-    std::cerr << file_to_modify << ": " << insert_include << " already there\n";
-    return EXIT_SUCCESS;
+  if (content.find(insert_header) != std::string::npos) {
+    std::cerr << file_to_modify << ": " << insert_header << " already there\n";
+    return true;
   }
 
   // Depending on what header type to insert, let's put it in the right group.
@@ -102,20 +99,38 @@ int main(int argc, char *argv[]) {
   // Up to first header.
   written += fwrite(content.data(), 1, insert_pos, tmp_out);
 
-  written += fwrite(insert_include.data(), 1, insert_include.size(), tmp_out);
+  written += fwrite(insert_header.data(), 1, insert_header.size(), tmp_out);
   written += fwrite("\n", 1, 1, tmp_out);
   written += fwrite(content.data() + insert_pos, 1,
                     content.size() - insert_pos, tmp_out);
 
-  const size_t expected_size = content.size() + insert_include.size() + 1;
+  const size_t expected_size = content.size() + insert_header.size() + 1;
   if (written != expected_size) {
     std::cerr << file_to_modify << ": Unexpected final size "
       "original file (" << written << " vs. " << expected_size << ")\n";
-    return EXIT_FAILURE;
+    return false;
   }
   if (fclose(tmp_out) != 0) return EXIT_FAILURE;
 
-  return (rename(tmp_file_name.c_str(), file_to_modify.c_str()) == 0)
-    ? EXIT_SUCCESS
-    : EXIT_FAILURE;
+  return rename(tmp_file_name.c_str(), file_to_modify.c_str()) == 0;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc < 3) {
+    return usage(argv[0]);
+  }
+  const bool is_angle_inc = argv[1][0] == '<';
+  const std::string insert_header =
+      is_angle_inc ? std::string("#include ") + argv[1]
+                   : std::string("#include \"") + argv[1] + "\"";
+  if (is_angle_inc && insert_header.back() != '>') {
+    std::cerr << "Missing '>' at include\n";
+    return EXIT_FAILURE;
+  }
+
+  bool success = true;
+  for (int i = 2; i < argc; ++i) {
+    success &= ModifyFile(argv[i], is_angle_inc, insert_header);
+  }
+  return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
