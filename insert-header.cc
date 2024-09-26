@@ -1,4 +1,3 @@
-#include <cstdlib>
 #if 0  // Invoke with /bin/sh or simply add executable bit on this file on Unix.
 B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #endif
@@ -16,13 +15,14 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-09-24)
+// Location: https://github.com/hzeller/dev-tools (2024-09-25)
 
 // Script that moves a particular include as the first header in a file.
 
-#include <stdio.h>
-
+#include <cerrno>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <optional>
