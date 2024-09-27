@@ -31,8 +31,8 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <header> <file>...\n", progname);
   fprintf(stderr,
-          "\tInsert a header into c/c++ file(s) if not there already.\n"
-          "\tHeader can be some simple string or bracketed with '<...>'\n"
+          "\tSimple way to insert a header into c/c++ file(s) if not there "
+          "already.\n\tHeader can be simple stirng or bracketed with '<...>'\n"
           "\tIf header starts with '<', it is attempted to be inserted near "
           "an angle-bracket header\n"
           "Example\n"
@@ -40,7 +40,7 @@ static int usage(const char *progname) {
           "\twill insert `#include <vector>` before the first angle include\n"
           "\tinto files foo.cc and bar.cc; Similarly,\n"
           "\t  %s 'hello/world.h' foo.cc bar.cc\n"
-          "\twill insert `#include \"hello/world.h\"` before the first quote "
+          "\twill insert `#include \"hello/world.h\"` before the second quote "
           "include.\n",
           progname, progname);
   return EXIT_FAILURE;
@@ -67,6 +67,34 @@ static std::optional<std::string> GetContent(const std::string &path) {
   return GetContent(file_to_read);
 }
 
+static size_t FindBestInsertPos(std::string_view content,
+                                bool is_angle_inc) {
+  // Depending on what header type to insert, let's put it in the right group.
+
+  // Angle header: just before the first angle header we find.
+  const size_t angle_header_inspos = content.find("#include <");
+
+  // Quote header: prefer inserting before the second one, as the first one
+  // might be the implementation header.
+  size_t quote_header_inspos = content.find("#include \"");
+  if (quote_header_inspos != std::string::npos) {
+    size_t second_quote_header = content.find("#include \"",
+                                              quote_header_inspos + 1);
+    if (second_quote_header != std::string::npos) {
+      quote_header_inspos = second_quote_header;
+    }
+  }
+
+  size_t insert_pos = is_angle_inc ? angle_header_inspos : quote_header_inspos;
+  if (insert_pos == std::string::npos) {
+    insert_pos = is_angle_inc ? quote_header_inspos : angle_header_inspos;
+  }
+  if (insert_pos == std::string::npos) {
+    insert_pos = 0;
+  }
+  return insert_pos;
+}
+
 static bool ModifyFile(const std::string &file_to_modify,
                        bool is_angle_inc,
                        const std::string &insert_header) {
@@ -81,16 +109,8 @@ static bool ModifyFile(const std::string &file_to_modify,
     return true;
   }
 
-  // Depending on what header type to insert, let's put it in the right group.
-  const size_t first_quote_header = content.find("#include \"");
-  const size_t first_angle_header = content.find("#include <");
-  size_t insert_pos = is_angle_inc ? first_angle_header : first_quote_header;
-  if (insert_pos == std::string::npos) {
-    insert_pos = is_angle_inc ? first_quote_header : first_angle_header;
-  }
-  if (insert_pos == std::string::npos) {
-    insert_pos = 0;
-  }
+  const size_t insert_pos = FindBestInsertPos(content, is_angle_inc);
+
   // Re-assemble file.
   const std::string tmp_file_name = file_to_modify + ".tmp";
   FILE *const tmp_out = fopen(tmp_file_name.c_str(), "wb");
