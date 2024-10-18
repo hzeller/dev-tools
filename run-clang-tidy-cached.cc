@@ -177,10 +177,8 @@ std::string GetContent(const fs::path &f) {
 }
 
 const char *EnvWithFallback(const char *varname, const char *fallback) {
-  if (const char *value = getenv(varname); value != nullptr) {
-    return value;
-  }
-  return fallback;
+  const char *value = getenv(varname);
+  return value ? value : fallback;
 }
 
 std::string GetCommandOutput(const std::string &prog) {
