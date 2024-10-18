@@ -7,9 +7,21 @@ Shell scripts
   * git-open-pr-files : find all the files that are currently open in PRs on GH
 
 C++ scripts
+These 'scripts' self-compile (see first line). If you set the executable
+bit (`chmod +x`), you can run them directly as if they were a script, or,
+you can invoke them with sh:
+
+```
+sh ./run-clang-tidy-cached.cc
+```
+
+These being c++ makes them easier to read and maintain for folks working with
+c++ anyway, simply using the included batteries of a c++17 environment.
+Only need a c++ compiler and no exotic scripting language installed.
+
   * run-clang-tidy-cached.cc : Run clang-tidy in parallel on project and cache
             results to speed up the pretty slow clang-tidy processing runtime.
-	    A c++ program that can be invoked as a 'script' (self-compiles).
+	    Allows for some configuration to local project.
   * move-header-to-front.cc : if a particular include is found in a file,
             move it right in front of the first include of that file if
 	    not already.

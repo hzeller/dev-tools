@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-09-25)
+// Location: https://github.com/hzeller/dev-tools (2024-10-18)
 
 // Script that moves a particular include as the first header in a file.
 
@@ -32,13 +32,16 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <header> <file>\n", progname);
   fprintf(stderr, "Example\n\t%s foo/bar.h src/foo/bar.cc\n\n", progname);
-  fprintf(stderr, "If an include of #include \"foo/bar.h\" is found in "
+  fprintf(stderr,
+          "If an include of #include \"foo/bar.h\" is found in "
           "src/foo/bar.cc, then it is moved before the first include.\n");
   return EXIT_FAILURE;
 }
 
 std::optional<std::string> GetContent(FILE *f) {
-  if (!f) return std::nullopt;
+  if (!f) {
+    return std::nullopt;
+  }
   std::string result;
   char buf[4096];
   while (const size_t r = fread(buf, 1, sizeof(buf), f)) {
@@ -51,8 +54,7 @@ std::optional<std::string> GetContent(FILE *f) {
 std::optional<std::string> GetContent(const std::string &path) {
   FILE *const file_to_read = fopen(path.c_str(), "rb");
   if (!file_to_read) {
-    fprintf(stderr, "%s: can't open: %s\n", path.c_str(),
-            strerror(errno));
+    fprintf(stderr, "%s: can't open: %s\n", path.c_str(), strerror(errno));
     return std::nullopt;
   }
   return GetContent(file_to_read);
@@ -63,7 +65,7 @@ int main(int argc, char *argv[]) {
     return usage(argv[0]);
   }
   const std::string expected_include =
-    std::string("#include \"") + argv[1] + "\"";
+      std::string("#include \"") + argv[1] + "\"";
   const std::string file_to_modify = argv[2];
 
   auto content_or = GetContent(file_to_modify);
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (our_header == first_header) {
-    //std::cerr << file_to_modify << ": Header already in right place.\n";
+    // std::cerr << file_to_modify << ": Header already in right place.\n";
     return EXIT_SUCCESS;
   }
 
@@ -113,8 +115,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Continue the snippet from formerly first header to our header
-  written += fwrite(content.data() + first_header, 1,
-                    our_header - first_header, tmp_out);
+  written += fwrite(content.data() + first_header, 1, our_header - first_header,
+                    tmp_out);
 
   // Skip the old position of our header and write rest of file.
   const char *rest_of_file = header_to_move.data() + header_to_move.size();
@@ -122,13 +124,17 @@ int main(int argc, char *argv[]) {
   written += fwrite(rest_of_file, 1, end_of_file - rest_of_file, tmp_out);
 
   if (written != content.size()) {
-    std::cerr << file_to_modify << ": Size we could write is not size of "
-      "original file (" << written << " vs. " << content.size() << ")\n";
+    std::cerr << file_to_modify
+              << ": Size we could write is not size of "
+                 "original file ("
+              << written << " vs. " << content.size() << ")\n";
     return EXIT_FAILURE;
   }
-  if (fclose(tmp_out) != 0) return EXIT_FAILURE;
+  if (fclose(tmp_out) != 0) {
+    return EXIT_FAILURE;
+  }
 
   return (rename(tmp_file_name.c_str(), file_to_modify.c_str()) == 0)
-    ? EXIT_SUCCESS
-    : EXIT_FAILURE;
+             ? EXIT_SUCCESS
+             : EXIT_FAILURE;
 }

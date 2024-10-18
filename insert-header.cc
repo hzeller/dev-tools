@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-09-25)
+// Location: https://github.com/hzeller/dev-tools (2024-10-18)
 
 // Script that moves a particular include as the first header in a file.
 
@@ -27,6 +27,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <iostream>
 #include <optional>
 #include <string>
+#include <string_view>
 
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <header> <file>...\n", progname);
@@ -47,7 +48,9 @@ static int usage(const char *progname) {
 }
 
 static std::optional<std::string> GetContent(FILE *f) {
-  if (!f) return std::nullopt;
+  if (!f) {
+    return std::nullopt;
+  }
   std::string result;
   char buf[4096];
   while (const size_t r = fread(buf, 1, sizeof(buf), f)) {
@@ -60,15 +63,13 @@ static std::optional<std::string> GetContent(FILE *f) {
 static std::optional<std::string> GetContent(const std::string &path) {
   FILE *const file_to_read = fopen(path.c_str(), "rb");
   if (!file_to_read) {
-    fprintf(stderr, "%s: can't open: %s\n", path.c_str(),
-            strerror(errno));
+    fprintf(stderr, "%s: can't open: %s\n", path.c_str(), strerror(errno));
     return std::nullopt;
   }
   return GetContent(file_to_read);
 }
 
-static size_t FindBestInsertPos(std::string_view content,
-                                bool is_angle_inc) {
+static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
   // Depending on what header type to insert, let's put it in the right group.
 
   // Angle header: just before the first angle header we find.
@@ -78,8 +79,8 @@ static size_t FindBestInsertPos(std::string_view content,
   // might be the implementation header.
   size_t quote_header_inspos = content.find("#include \"");
   if (quote_header_inspos != std::string::npos) {
-    size_t second_quote_header = content.find("#include \"",
-                                              quote_header_inspos + 1);
+    size_t second_quote_header =
+        content.find("#include \"", quote_header_inspos + 1);
     if (second_quote_header != std::string::npos) {
       quote_header_inspos = second_quote_header;
     }
@@ -95,8 +96,7 @@ static size_t FindBestInsertPos(std::string_view content,
   return insert_pos;
 }
 
-static bool ModifyFile(const std::string &file_to_modify,
-                       bool is_angle_inc,
+static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
                        const std::string &insert_header) {
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {
@@ -121,16 +121,20 @@ static bool ModifyFile(const std::string &file_to_modify,
 
   written += fwrite(insert_header.data(), 1, insert_header.size(), tmp_out);
   written += fwrite("\n", 1, 1, tmp_out);
-  written += fwrite(content.data() + insert_pos, 1,
-                    content.size() - insert_pos, tmp_out);
+  written += fwrite(content.data() + insert_pos, 1, content.size() - insert_pos,
+                    tmp_out);
 
   const size_t expected_size = content.size() + insert_header.size() + 1;
   if (written != expected_size) {
-    std::cerr << file_to_modify << ": Unexpected final size "
-      "original file (" << written << " vs. " << expected_size << ")\n";
+    std::cerr << file_to_modify
+              << ": Unexpected final size "
+                 "original file ("
+              << written << " vs. " << expected_size << ")\n";
     return false;
   }
-  if (fclose(tmp_out) != 0) return EXIT_FAILURE;
+  if (fclose(tmp_out) != 0) {
+    return false;
+  }
 
   return rename(tmp_file_name.c_str(), file_to_modify.c_str()) == 0;
 }
