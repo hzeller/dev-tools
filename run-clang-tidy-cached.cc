@@ -480,7 +480,7 @@ class FileGatherer {
 
     // Assemble the separate outputs into a single file. Tally up per-check.
     // The names have at least one dash in them.
-    const std::regex check_re("\n.*(\\[[a-zA-Z.]+-[a-zA-Z.-]+\\])\n");
+    const std::regex check_re("(?:^|\n).*(\\[[a-zA-Z.]+-[a-zA-Z.-]+\\])\n");
     std::map<std::string, int> checks_seen;
     std::unordered_set<std::string> line_already_seen;  // de-dup
     std::ofstream tidy_collect(tidy_outfile);
