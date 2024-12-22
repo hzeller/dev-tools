@@ -56,6 +56,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -122,6 +123,7 @@ static constexpr ConfigValues kConfig = {
     // Example:
     //.start_dir = "src/",
     //.file_exclude_re = ".git/|.github/|scripts/",
+    //.revisit_brokenfiles_if_build_config_newer = false,
 };
 // --------------------------------------------------------------
 
@@ -478,16 +480,19 @@ class FileGatherer {
 
     // Assemble the separate outputs into a single file. Tally up per-check.
     // The names have at least one dash in them.
-    const std::regex check_re("(\\[[a-zA-Z.]+-[a-zA-Z.-]+\\])\n");
+    const std::regex check_re("\n.*(\\[[a-zA-Z.]+-[a-zA-Z.-]+\\])\n");
     std::map<std::string, int> checks_seen;
+    std::unordered_set<std::string> line_already_seen;  // de-dup
     std::ofstream tidy_collect(tidy_outfile);
     for (const filepath_contenthash_t &f : files_of_interest_) {
-      const auto tidy = store_.GetContentFor(f);
+      const std::string tidy = store_.GetContentFor(f);
       if (!tidy.empty()) {
         tidy_collect << f.first.string() << ":\n" << tidy;
       }
       for (ReIt it(tidy.begin(), tidy.end(), check_re); it != ReIt(); ++it) {
-        checks_seen[(*it)[1].str()]++;
+        if (line_already_seen.insert((*it)[0]).second) {
+          checks_seen[(*it)[1].str()]++;
+        }
       }
     }
     tidy_collect.close();
