@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-11-09)
+// Location: https://github.com/hzeller/dev-tools (2024-12-22)
 
 // Script to run clang-tidy on files in a bazel project while caching the
 // results as clang-tidy can be pretty slow. The clang-tidy output messages
@@ -476,8 +476,9 @@ class FileGatherer {
     const fs::path tidy_outfile = cache_dir / ("tidy.out-" + suffix);
     const fs::path tidy_summary = cache_dir / ("tidy-summary.out-" + suffix);
 
-    // Assemble the separate outputs into a single file. Tally up per-check
-    const std::regex check_re("(\\[[a-zA-Z.-]+\\])\n");
+    // Assemble the separate outputs into a single file. Tally up per-check.
+    // The names have at least one dash in them.
+    const std::regex check_re("(\\[[a-zA-Z.]+-[a-zA-Z.-]+\\])\n");
     std::map<std::string, int> checks_seen;
     std::ofstream tidy_collect(tidy_outfile);
     for (const filepath_contenthash_t &f : files_of_interest_) {
