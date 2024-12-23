@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2024-12-22)
+// Location: https://github.com/hzeller/dev-tools (2024-12-23)
 
 // Script to run clang-tidy on files in a bazel project while caching the
 // results as clang-tidy can be pretty slow. The clang-tidy output messages
@@ -31,6 +31,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 //  CLANG_TIDY         = binary to run; default would just be clang-tidy.
 //  CLANG_TIDY_CONFIG  = override configuration file in kConfig.clang_tidy_file
 //  CACHE_DIR          = where to put the cached content; default ~/.cache
+//  CLANG_TIDY_JOBS    = Number of tasks to run in parallel.
 
 // This file shall be c++17 self-contained; not using any re2 or absl niceties.
 #include <unistd.h>
@@ -259,8 +260,12 @@ class ClangTidyRunner {
     if (work_queue->empty()) {
       return;
     }
-    const int kJobs = std::thread::hardware_concurrency();
-    std::cerr << work_queue->size() << " files to process...";
+    const char *jobs_env_str = getenv("CLANG_TIDY_JOBS");
+    const int jobs_env_num = jobs_env_str ? atoi(jobs_env_str) : -1;
+    const int kJobs = (jobs_env_num > 0 ? jobs_env_num
+                                        : std::thread::hardware_concurrency());
+    std::cerr << work_queue->size() << " files to process (w/ " << kJobs
+              << " jobs)...";
 
     const bool print_progress = isatty(STDERR_FILENO);
     if (!print_progress) {
