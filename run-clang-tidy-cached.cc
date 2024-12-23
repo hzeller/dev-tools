@@ -272,6 +272,7 @@ class ClangTidyRunner {
       std::cerr << "\n";
     }
 
+    const std::string uniquifier = std::to_string(getpid());
     std::mutex queue_access_lock;
     auto clang_tidy_runner = [&]() {
       for (;;) {
@@ -288,7 +289,7 @@ class ClangTidyRunner {
           work_queue->pop_front();
         }
         const fs::path final_out = output_store.PathFor(work);
-        const std::string tmp_out = final_out.string() + ".tmp";
+        const std::string tmp_out = final_out.string() + ".tmp." + uniquifier;
         // Putting the file to clang-tidy early in the command line so that
         // it is easy to find with `ps` or `top`.
         const std::string command = clang_tidy_ + " '" + work.first.string() +
