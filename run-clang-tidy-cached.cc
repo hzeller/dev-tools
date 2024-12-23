@@ -300,6 +300,8 @@ class ClangTidyRunner {
         // NOLINTBEGIN
         if (WIFSIGNALED(r) &&
             (WTERMSIG(r) == SIGINT || WTERMSIG(r) == SIGQUIT)) {
+          std::error_code ignored_error;
+          fs::remove(tmp_out, ignored_error);
           break;  // got Ctrl-C
         }
         // NOLINTEND
