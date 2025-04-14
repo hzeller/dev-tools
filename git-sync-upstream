@@ -4,10 +4,9 @@
 # first
 set -e
 
-MAIN_BRANCH=$(git remote set-head origin --auto | awk '{print $4}')
-
 git pull
 if git fetch upstream; then
+    MAIN_BRANCH=$(git remote show origin | awk '/HEAD branch/ {print $3}')
     git checkout $MAIN_BRANCH
     git merge upstream/$MAIN_BRANCH
     git push
