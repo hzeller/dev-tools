@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2025-04-14)
+// Location: https://github.com/hzeller/dev-tools (2025-05-13)
 
 // Script to run clang-tidy on files in a bazel project while caching the
 // results as clang-tidy can be pretty slow. The clang-tidy output messages
@@ -148,7 +148,7 @@ inline bool IsIncludeExtension(std::string_view extension) {
 
 // Filter for source files to be considered.
 inline bool ConsiderExtension(const std::string_view ext) {
-  return IsOneOf(ext, {".cc", ".cpp", ".cxx"}) || IsIncludeExtension(ext);
+  return IsOneOf(ext, {".c", ".cc", ".cpp", ".cxx"}) || IsIncludeExtension(ext);
 }
 
 namespace {
