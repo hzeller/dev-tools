@@ -31,6 +31,9 @@ REPLACEMENT_FILE=$2
 
 awk -vBASEDIR="$BASEDIR" -vTIDY_OUT="$TIDY_OUT" -f- "$REPLACEMENT_FILE" <<'EOF'
 {
+  if ($1 == "") {
+    next;
+  }
   if ($2 != "") {
     CURRENT_HEADER=$2;
   }
