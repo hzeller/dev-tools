@@ -40,7 +40,7 @@ awk -vBASEDIR="$BASEDIR" -vTIDY_OUT="$TIDY_OUT" -f- "$REPLACEMENT_FILE" <<'EOF'
   if ($2 != "") {
     CURRENT_HEADER=$2;
   }
-  printf("%s/insert-header.cc '%s' $(awk -F: '/no header providing \"%s\".*misc-include-cleaner/ {print $1}' %s | sort | uniq)\n",
+  printf("%s/insert-header.cc '%s' -q $(awk -F: '/no header providing \"%s\".*misc-include-cleaner/ {print $1}' %s | sort | uniq)\n",
   	       BASEDIR, CURRENT_HEADER, $1, TIDY_OUT);
 }
 EOF

@@ -30,7 +30,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <string_view>
 
 static int usage(const char *progname) {
-  fprintf(stderr, "Usage: %s <header> <file>...\n", progname);
+  fprintf(stderr, "Usage: %s <header> [-q] <file>...\n", progname);
   fprintf(stderr,
           "\tSimple way to insert a header into c/c++ file(s) if not there "
           "already.\n\tHeader can be simple stirng or bracketed with '<...>'\n"
@@ -155,6 +155,11 @@ int main(int argc, char *argv[]) {
 
   bool success = true;
   for (int i = 2; i < argc; ++i) {
+    if (strcmp(argv[i], "-q") == 0) {
+      // Allow to have a '-q' flag that then does not complain about
+      // an empty list of files.
+      continue;
+    }
     success &= ModifyFile(argv[i], is_angle_inc, insert_header);
   }
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
