@@ -12,10 +12,13 @@ The replacment list file has two columns, that are whitespace delimited.
 The first column contains a regular expression for a symbol that is missing,
 the second column says corresponding header to include. If there are multiple
 rows that include the same header, the header only has to be mentioned the
-first time in that column.
+first time in that second column.
+Example:
+
+foo::SomeClass  path/to/myclass.h
 
 Each line will be translated to a one-liner script to insert the
-corresponding header.
+corresponding header, i.e. source the output to perform the necessary edits.
 
 Tip:
 To get an overview list of symbols that are used without their header, run
