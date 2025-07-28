@@ -34,7 +34,7 @@ REPLACEMENT_FILE=$2
 
 awk -vBASEDIR="$BASEDIR" -vTIDY_OUT="$TIDY_OUT" -f- "$REPLACEMENT_FILE" <<'EOF'
 {
-  if ($1 == "") {
+  if ($1 == "" || match($1, /^#/)) {
     next;
   }
   if ($2 != "") {
