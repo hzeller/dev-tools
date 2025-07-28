@@ -33,13 +33,14 @@ static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <header> [-q] <file>...\n", progname);
   fprintf(stderr,
           "\tSimple way to insert a header into c/c++ file(s) if not there "
-          "already.\n\tHeader can be simple stirng or bracketed with '<...>'\n"
+          "already.\n\tHeader can be simple string (in which case it is "
+          "included with \"...\") or bracketed with '<...>'.\n"
           "\tIf header starts with '<', it is attempted to be inserted near "
-          "an angle-bracket header\n"
+          "an angle-bracket header.\n\n"
           "Example\n"
           "\t  %s '<vector>' foo.cc bar.cc\n"
           "\twill insert `#include <vector>` before the first angle include\n"
-          "\tinto files foo.cc and bar.cc; Similarly,\n"
+          "\tinto files foo.cc and bar.cc;\n\n\tSimilarly,\n"
           "\t  %s 'hello/world.h' foo.cc bar.cc\n"
           "\twill insert `#include \"hello/world.h\"` before the second quote "
           "include.\n",
