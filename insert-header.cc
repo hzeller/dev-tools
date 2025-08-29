@@ -74,15 +74,15 @@ static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
   // Depending on what header type to insert, let's put it in the right group.
 
   // Angle header: just before the first angle header we find.
-  const size_t angle_header_inspos = content.find("#include <");
+  const size_t angle_header_inspos = content.find("\n#include <");
 
   // Quote header: prefer inserting before the second one, as the first one
   // might be the implementation header.
-  const size_t first_quote_header_inspos = content.find("#include \"");
+  const size_t first_quote_header_inspos = content.find("\n#include \"");
   size_t quote_header_inspos = first_quote_header_inspos;
   if (quote_header_inspos != std::string::npos) {
     const size_t second_quote_header =
-        content.find("#include \"", quote_header_inspos + 1);
+        content.find("\n#include \"", quote_header_inspos + 1);
     if (second_quote_header != std::string::npos) {
       quote_header_inspos = second_quote_header;
     }
@@ -95,7 +95,9 @@ static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
   if (insert_pos == std::string::npos) {
     insert_pos = 0;
   }
-  return insert_pos;
+
+  // All our searches start with the preceeding newline; insert where '#' is.
+  return insert_pos + 1;
 }
 
 static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
