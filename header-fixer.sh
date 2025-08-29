@@ -37,10 +37,13 @@ awk -vBASEDIR="$BASEDIR" -vTIDY_OUT="$TIDY_OUT" -f- "$REPLACEMENT_FILE" <<'EOF'
   if ($1 == "" || match($1, /^#/)) {
     next;
   }
+  CURRENT_SYMBOL=$1
   if ($2 != "") {
-    CURRENT_HEADER=$2;
+    # Get all the rest of the line as header. It might have comments.
+    $1="";
+    CURRENT_HEADER=$0;
   }
   printf("%s/insert-header.cc '%s' -q $(awk -F: '/no header providing \"%s\".*misc-include-cleaner/ {print $1}' %s | sort | uniq)\n",
-  	       BASEDIR, CURRENT_HEADER, $1, TIDY_OUT);
+         BASEDIR, CURRENT_HEADER, CURRENT_SYMBOL, TIDY_OUT);
 }
 EOF

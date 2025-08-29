@@ -93,7 +93,7 @@ static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
     insert_pos = is_angle_inc ? first_quote_header_inspos : angle_header_inspos;
   }
   if (insert_pos == std::string::npos) {
-    insert_pos = 0;
+    return 0;
   }
 
   // All our searches start with the preceeding newline; insert where '#' is.
@@ -147,11 +147,22 @@ int main(int argc, char *argv[]) {
   if (argc < 3) {
     return usage(argv[0]);
   }
-  const bool is_angle_inc = argv[1][0] == '<';
+  std::string_view header(argv[1]);
+  while (!header.empty() && isspace(header.front())) header.remove_prefix(1);
+  while (!header.empty() && isspace(header.back())) header.remove_suffix(1);
+  if (header.length() < 2) {
+    return usage(argv[0]);
+  }
+
+  const bool is_angle_inc = (header[0] == '<');
+  const bool has_quote_prefix_already = (header[0] == '"');
+  const std::string hash_include("#include ");
+  const std::string inc_header(header);
   const std::string insert_header =
-      is_angle_inc ? std::string("#include ") + argv[1]
-                   : std::string("#include \"") + argv[1] + "\"";
-  if (is_angle_inc && insert_header.back() != '>') {
+      is_angle_inc || has_quote_prefix_already
+          ? hash_include + inc_header
+          : hash_include + "\"" + inc_header + "\"";
+  if (is_angle_inc && insert_header.find_first_of('>') == std::string::npos) {
     std::cerr << "Missing '>' at include\n";
     return EXIT_FAILURE;
   }
