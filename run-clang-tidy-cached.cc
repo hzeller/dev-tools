@@ -264,8 +264,8 @@ class ClangTidyRunner {
     }
     const char *jobs_env_str = getenv("CLANG_TIDY_JOBS");
     const int jobs_env_num = jobs_env_str ? atoi(jobs_env_str) : -1;
-    const int kJobs = (jobs_env_num > 0 ? jobs_env_num
-                                        : std::thread::hardware_concurrency());
+    const int kJobs =
+        (jobs_env_num > 0 ? jobs_env_num : std::thread::hardware_concurrency());
     std::cerr << work_queue->size() << " files to process (w/ " << kJobs
               << " jobs)...";
 
@@ -341,9 +341,7 @@ class ClangTidyRunner {
 
   static std::string AssembleArgs(int argc, char **argv) {
     std::string result = " --quiet";
-    result.append(" '--config-file=")
-      .append(GetClangTidyConfig())
-        .append("'");
+    result.append(" '--config-file=").append(GetClangTidyConfig()).append("'");
     for (const std::string_view arg : kExtraArgs) {
       result.append(" --extra-arg='").append(arg).append("'");
     }

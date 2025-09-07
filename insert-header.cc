@@ -19,6 +19,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 
 // Script that moves a particular include as the first header in a file.
 
+#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
@@ -148,8 +149,12 @@ int main(int argc, char *argv[]) {
     return usage(argv[0]);
   }
   std::string_view header(argv[1]);
-  while (!header.empty() && isspace(header.front())) header.remove_prefix(1);
-  while (!header.empty() && isspace(header.back())) header.remove_suffix(1);
+  while (!header.empty() && isspace(header.front())) {
+    header.remove_prefix(1);
+  }
+  while (!header.empty() && isspace(header.back())) {
+    header.remove_suffix(1);
+  }
   if (header.length() < 2) {
     return usage(argv[0]);
   }
