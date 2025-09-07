@@ -18,7 +18,8 @@ Small shell-scripts that make interacting with github repos
       all the files that are currently open in PRs on
       GitHub which can be useful for larger refactorings and you want to
       avoid touching files currently being reviewed. Requires the `gh` command
-      line.
+      line and possibly `gh` login to query the API.
+      Outputs a list of files that are currently in open pull requests.
 
 ## C++ cleanup scripts
 
@@ -44,7 +45,7 @@ track of the results.
 It requires a `.clang-tidy` config in your project and a compilation database,
 (`compile_flags.txt` or `compile_commands.json`).
 
-Just copy into your project and update the [configuration section])https://github.com/hzeller/dev-tools/blob/f40950208913ee9ff8cc70916b8100713087b60c/run-clang-tidy-cached.cc#L121-L130) if needed.
+Just copy into your project and, if needed, update the configuration section https://github.com/hzeller/dev-tools/blob/f40950208913ee9ff8cc70916b8100713087b60c/run-clang-tidy-cached.cc#L121-L130
 
 Usage in the simplest case:
 
