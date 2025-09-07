@@ -218,7 +218,7 @@ other projects and then can refer to them with a relative path:
 If you need local configuration, just copy the script locally and modify the
 config section.
 
-## To clean missing headers (misc-include-cleaner)
+## Add missing headers (misc-include-cleaner)
 
 For that, you first have to create some file with the mapping of type to
 header file as discussed in the header-fixer section.
@@ -256,7 +256,7 @@ the fix-headers.txt will typically accumulate a few mappings over time, but
 the neat thing is, you can re-run the header-fixer many times and it will only
 modify the files that actually need changing.
 
-## Clean files not needed
+## Remove header inclusion that are not needed (misc-include-cleaner)
 
 If all needed headers are added, you then can remove all not needed headers.
 
