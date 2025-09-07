@@ -2,7 +2,7 @@
 
 if [ $# -ne 1 ] ; then
   echo "Usage: $0 <clang-tidy-out>"
-  echo "Remove all headers clang-tidy found to not be used directly"
+  echo "Emit a script that removes all headers clang-tidy found to not be used directly"
   exit 1
 fi
 
