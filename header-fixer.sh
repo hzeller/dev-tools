@@ -43,7 +43,7 @@ awk -vBASEDIR="$BASEDIR" -vTIDY_OUT="$TIDY_OUT" -f- "$REPLACEMENT_FILE" <<'EOF'
     $1="";
     CURRENT_HEADER=$0;
   }
-  printf("%s/insert-header.cc '%s' -q $(awk -F: '/no header providing \"%s\".*misc-include-cleaner/ {print $1}' %s | sort | uniq)\n",
-         BASEDIR, CURRENT_HEADER, CURRENT_SYMBOL, TIDY_OUT);
+  printf("%s/insert-header.cc '%s' -q -e'for %s' $(awk -F: '/no header providing \"%s\".*misc-include-cleaner/ {print $1}' %s | sort | uniq)\n",
+         BASEDIR, CURRENT_HEADER, CURRENT_SYMBOL, CURRENT_SYMBOL, TIDY_OUT);
 }
 EOF

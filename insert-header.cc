@@ -19,6 +19,8 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 
 // Script that moves a particular include as the first header in a file.
 
+#include <unistd.h>
+
 #include <cctype>
 #include <cerrno>
 #include <cstddef>
@@ -31,20 +33,25 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <string_view>
 
 static int usage(const char *progname) {
-  fprintf(stderr, "Usage: %s <header> [-q] <file>...\n", progname);
+  fprintf(stderr, "Usage: %s <header> [-q] [-e<explanation>] <file>...\n",
+          progname);
   fprintf(stderr,
-          "\tSimple way to insert a header into c/c++ file(s) if not there "
-          "already.\n\tHeader can be simple string (in which case it is "
+          "\nSimple way to insert a header into c/c++ file(s) if not there "
+          "already.\nHeader can be simple string (in which case it is "
           "included with \"...\") or bracketed with '<...>'.\n"
-          "\tIf header starts with '<', it is attempted to be inserted near "
+          "If header starts with '<', it is attempted to be inserted near "
           "an angle-bracket header.\n\n"
-          "Example\n"
+          "Example:\n"
           "\t  %s '<vector>' foo.cc bar.cc\n"
           "\twill insert `#include <vector>` before the first angle include\n"
           "\tinto files foo.cc and bar.cc;\n\n\tSimilarly,\n"
           "\t  %s 'hello/world.h' foo.cc bar.cc\n"
           "\twill insert `#include \"hello/world.h\"` before the second quote "
-          "include.\n",
+          "include.\n\n"
+          "Options:\n"
+          "\t-q              : quiet. Less verbose about info messages.\n"
+          "\t-e<explanation> : Print explanation-text on successful header-add\n"
+          "\t-a<width>       : When printing message: align filename width\n",
           progname, progname);
   return EXIT_FAILURE;
 }
@@ -102,16 +109,28 @@ static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
 }
 
 static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
-                       const std::string &insert_header) {
+                       const std::string &insert_header,
+                       bool quiet,
+                       int align_len,
+                       const std::string &explanation) {
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {
     return false;
   }
   const std::string &content = *content_or;
 
+  const std::string report_filename = file_to_modify + ":";
   if (content.find(insert_header) != std::string::npos) {
-    std::cerr << file_to_modify << ": " << insert_header << " already there\n";
+    if (!quiet) {
+      fprintf(stderr, "%*s %s already there\n", -align_len,
+              report_filename.c_str(), insert_header.c_str());
+    }
     return true;
+  }
+
+  if (!explanation.empty()) {
+    fprintf(stdout, "%*s %s %s\n", -align_len, report_filename.c_str(),
+            insert_header.c_str(), explanation.c_str());
   }
 
   const size_t insert_pos = FindBestInsertPos(content, is_angle_inc);
@@ -145,10 +164,35 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) {
+  bool quiet = false;
+  std::string explanation;
+  int print_alignment = 40;
+  int opt;
+  while ((opt = getopt(argc, argv, "qe:")) != -1) {
+    switch (opt) {
+      case 'q':
+        quiet = true;
+        break;
+      case 'e':
+        explanation = optarg;
+        break;
+      case 'a':
+        print_alignment = atoi(optarg);
+        break;
+      default:
+        return usage(argv[0]);
+    }
+  }
+
+  const int header_arg = optind;
+  const int start_files = optind + 1;
+
+  if (header_arg >= argc) {
+    std::cerr << "Expected header to include\n";
     return usage(argv[0]);
   }
-  std::string_view header(argv[1]);
+
+  std::string_view header(argv[header_arg]);
   while (!header.empty() && isspace(header.front())) {
     header.remove_prefix(1);
   }
@@ -172,14 +216,14 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  if (start_files >= argc && !quiet) {
+    std::cerr << "No files provided\n";
+  }
+
   bool success = true;
-  for (int i = 2; i < argc; ++i) {
-    if (strcmp(argv[i], "-q") == 0) {
-      // Allow to have a '-q' flag that then does not complain about
-      // an empty list of files.
-      continue;
-    }
-    success &= ModifyFile(argv[i], is_angle_inc, insert_header);
+  for (int i = start_files; i < argc; ++i) {
+    success &= ModifyFile(argv[i], is_angle_inc, insert_header,
+                          quiet, print_alignment, explanation);
   }
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
