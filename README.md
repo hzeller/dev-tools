@@ -65,7 +65,7 @@ something like
 
 ... as well as all the details in `Project_clang-tidy.out`; I usually use
 that to step through these with the IDE (e.g. in `emacs`, use
-`M-x compile-command`, `cd project-root; cat Project_clang-tidy.out` and
+`M-x compile-command`, `cd project-root; cat Project_clang-tidy.out`) and
 then step through each messages as if it was a compiler output.
 
 Next time you run `run-clang-tidy-cached.cc` it can be very fast as it only
@@ -79,7 +79,7 @@ if you wipe your project directory.
 ./run-clang-tidy-cached.cc
 ```
 
-... but you can also provide flags that are then passed onto `clang-tidy`
+... but you can also provide flags that are then passed to `clang-tidy`
 
 ```
 ./run-clang-tidy-cached.cc --checks="-*,modernize-use-override" --fix
@@ -89,8 +89,8 @@ Also check the [environment variable description](https://github.com/hzeller/dev
 
 ### [insert-header.cc](./insert-header.cc)
 Insert a header into file(s), if not already there.  Puts `<>`-headers before
-the first `<>`-header, others as the second `""`-header (if available) (Why
-second ? The first `""`-header is typically the implementation header).
+the first `<>`-header, others after the first `""`-header (if available) (Why
+after first ? The first `""`-header might be the implementation header).
 
 Other than that, does not make any attempt to sort the final headers or
 understand if it ended up in the right group (that is what `clang-format` is
@@ -139,18 +139,19 @@ particular dealing with missing or superfluous headers (the
 
 This helps adding headers that are needed but missing. Unfortunately,
 `clang-tidy` does not tell use where the header would be (if often certainly
-would know), so you first have to create a configuration file, say
-`fix-headers.txt`:
+would know), so you first have to create a configuration file with a regular
+expression for the type in the first column, the corresponding header in the
+second; say `fix-headers.txt`:
 
 ```
-u?int[123468]*_t <cstdint>
-FILE             <cstdio>
-f?printf         <cstdio>
-std::sort        <algorithm>
-std::pair        <utility>
-std::string      <string>
-std::vector      <vector>
-(std::)?isspace  <cctype>
+(std::)?u?int[123468]*_t <cstdint>
+FILE                     <cstdio>
+f?printf                 <cstdio>
+std::sort                <algorithm>
+std::pair                <utility>
+std::string              <string>
+std::vector              <vector>
+(std::)?isspace          <cctype>
 My::ProjectClass path/to/project-specific/header.h
 ```
 
@@ -241,7 +242,7 @@ And you get an output like this:
 So let's write a fix-headers.txt that addresses these
 
 ```
-u?int[123468]*_t <cstdint>
+(std::)u?int[123468]*_t <cstdint>
 std::string      <string>
 std::vector      <vector>
 ```
