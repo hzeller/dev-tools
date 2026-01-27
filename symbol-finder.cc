@@ -92,16 +92,19 @@ class TypeDefinitionVisitor
       if (fileName.starts_with(cwd_)) {
         fileName = fileName.substr(cwd_.length() + 1);
       }
+      auto canonical = std::filesystem::path(fileName.begin(), fileName.end())
+                           .lexically_normal()
+                           .string();
 #if 0
       // Full info
       const std::string kind = node->getDeclKindName();
       const int line_number = FullLocation.getSpellingLineNumber();
       std::cout << std::left << std::setw(40) << name << "\t" << kind
-                << "\t" << std::string_view(fileName) << "\t" << line_number << "\n";
+                << "\t" << canonical << "\t" << line_number << "\n";
 #else
       // Relevant stuff that header-fixer will need
-      std::cout << std::left << std::setw(40) << name << " "
-                << std::string_view(fileName) << "\n";
+      std::cout << std::left << std::setw(40) << name << " " << canonical
+                << "\n";
 #endif
     }
     return true;
