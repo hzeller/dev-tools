@@ -74,6 +74,12 @@ class TypeDefinitionVisitor
       // Not interested in templated classes.
       return true;
     }
+
+    if (name.find("::(") != std::string_view::npos) {
+      // Some sort of anonymous namespace
+      return true;
+    }
+
     // Soemtimes we get that these are allegedly in the 'std::' namespace.
     // This is probably due to some bogus 'using namespace std;' somewhere.
     // Let's remove (we already filtered out system headers)
