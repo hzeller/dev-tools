@@ -32,6 +32,22 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <string>
 #include <string_view>
 
+namespace {
+struct Options {
+  // Quiet operation. Don't print informational messages.
+  bool quiet = false;
+
+  // Explanation to write on stderr if header added.
+  std::string explanation;
+
+  // Alignment for informational messages
+  int print_alignment = 40;
+
+  // Starting point for writing headers, if found.
+  std::string insert_marker;
+};
+}  // namespace
+
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <header> [-q] [-e<explanation>] <file>...\n",
           progname);
@@ -51,6 +67,7 @@ static int usage(const char *progname) {
           "Options:\n"
           "\t-q              : quiet. Less verbose about info messages.\n"
           "\t-e<explanation> : Print explanation-text on successful header-add\n"
+          "\t-m<write-marker>: Add headers after this marker text if available\n"
           "\t-a<width>       : When printing message: align filename width\n",
           progname, progname);
   return EXIT_FAILURE;
@@ -78,15 +95,17 @@ static std::optional<std::string> GetContent(const std::string &path) {
   return GetContent(file_to_read);
 }
 
-static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
+static size_t FindBestInsertPos(size_t from_marker,
+                                std::string_view content, bool is_angle_inc) {
   // Depending on what header type to insert, let's put it in the right group.
 
   // Angle header: just before the first angle header we find.
-  const size_t angle_header_inspos = content.find("\n#include <");
+  const size_t angle_header_inspos = content.find("\n#include <", from_marker);
 
   // Quote header: prefer inserting before the second one, as the first one
   // might be the implementation header.
-  const size_t first_quote_header_inspos = content.find("\n#include \"");
+  const size_t first_quote_header_inspos = content.find("\n#include \"",
+                                                        from_marker);
   size_t quote_header_inspos = first_quote_header_inspos;
   if (quote_header_inspos != std::string::npos) {
     const size_t second_quote_header =
@@ -110,9 +129,7 @@ static size_t FindBestInsertPos(std::string_view content, bool is_angle_inc) {
 
 static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
                        const std::string &insert_header,
-                       bool quiet,
-                       int align_len,
-                       const std::string &explanation) {
+                       const Options &options) {
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {
     return false;
@@ -121,19 +138,25 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
 
   const std::string report_filename = file_to_modify + ":";
   if (content.find(insert_header) != std::string::npos) {
-    if (!quiet) {
-      fprintf(stderr, "%*s %s already there\n", -align_len,
+    if (!options.quiet) {
+      fprintf(stderr, "%*s %s already there\n", -options.print_alignment,
               report_filename.c_str(), insert_header.c_str());
     }
     return true;
   }
 
-  if (!explanation.empty()) {
-    fprintf(stdout, "%*s %s %s\n", -align_len, report_filename.c_str(),
-            insert_header.c_str(), explanation.c_str());
+  if (!options.explanation.empty()) {
+    fprintf(stdout, "%*s %s %s\n", -options.print_alignment, report_filename.c_str(),
+            insert_header.c_str(), options.explanation.c_str());
   }
 
-  const size_t insert_pos = FindBestInsertPos(content, is_angle_inc);
+
+  size_t insert_mark = 0;
+  if (auto m = content.find(options.insert_marker); m != std::string::npos) {
+    insert_mark = m;
+  }
+
+  const size_t insert_pos = FindBestInsertPos(insert_mark, content, is_angle_inc);
 
   // Re-assemble file.
   const std::string tmp_file_name = file_to_modify + ".tmp";
@@ -164,20 +187,21 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
 }
 
 int main(int argc, char *argv[]) {
-  bool quiet = false;
-  std::string explanation;
-  int print_alignment = 40;
+  Options options;
   int opt;
-  while ((opt = getopt(argc, argv, "qe:")) != -1) {
+  while ((opt = getopt(argc, argv, "qe:a:m:")) != -1) {
     switch (opt) {
       case 'q':
-        quiet = true;
+        options.quiet = true;
         break;
       case 'e':
-        explanation = optarg;
+        options.explanation = optarg;
         break;
       case 'a':
-        print_alignment = atoi(optarg);
+        options.print_alignment = atoi(optarg);
+        break;
+      case 'm':
+        options.insert_marker = optarg;
         break;
       default:
         return usage(argv[0]);
@@ -216,14 +240,13 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  if (start_files >= argc && !quiet) {
+  if (start_files >= argc && !options.quiet) {
     std::cerr << "No files provided\n";
   }
 
   bool success = true;
   for (int i = start_files; i < argc; ++i) {
-    success &= ModifyFile(argv[i], is_angle_inc, insert_header,
-                          quiet, print_alignment, explanation);
+    success &= ModifyFile(argv[i], is_angle_inc, insert_header, options);
   }
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
