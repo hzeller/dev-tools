@@ -120,7 +120,7 @@ static size_t FindBestInsertPos(size_t from_marker,
     insert_pos = is_angle_inc ? first_quote_header_inspos : angle_header_inspos;
   }
   if (insert_pos == std::string::npos) {
-    return 0;
+    return from_marker;
   }
 
   // All our searches start with the preceeding newline; insert where '#' is.
@@ -153,7 +153,12 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
 
   size_t insert_mark = 0;
   if (auto m = content.find(options.insert_marker); m != std::string::npos) {
-    insert_mark = m;
+    insert_mark = m + options.insert_marker.length();
+    // Insert after the line matching this
+    while (insert_mark < content.length() && content[insert_mark] != '\n') {
+      ++insert_mark;
+    }
+    ++insert_mark;
   }
 
   const size_t insert_pos = FindBestInsertPos(insert_mark, content, is_angle_inc);
