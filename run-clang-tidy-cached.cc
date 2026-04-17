@@ -15,7 +15,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++17 -o"$B" "$0" && exec "$B" "$@";
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Location: https://github.com/hzeller/dev-tools (2025-05-13)
+// Location: https://github.com/hzeller/dev-tools (2026-04-17)
 
 // Script to run clang-tidy on files in a bazel project while caching the
 // results as clang-tidy can be pretty slow. The clang-tidy output messages
@@ -340,7 +340,7 @@ class ClangTidyRunner {
   }
 
   static std::string AssembleArgs(int argc, char **argv) {
-    std::string result = " --quiet";
+    std::string result = " --quiet --header-filter=''";
     result.append(" '--config-file=").append(GetClangTidyConfig()).append("'");
     for (const std::string_view arg : kExtraArgs) {
       result.append(" --extra-arg='").append(arg).append("'");
@@ -377,6 +377,7 @@ class ClangTidyRunner {
   // Filter clang-tidy output and write only lines that are reported for
   // the 'interesting_file'. Clang-tidy tends to also report warnings for
   // some included files, but we're not interested in them.
+  // (maybe not needed anymore with -header-filter)
   static void FilterCheckLines(std::string_view interesting_file,
                                const std::string &in, std::ostream &out) {
     // Extract basename of lines that have a clang-tidy check at end.
