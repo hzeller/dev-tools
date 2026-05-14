@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ $# -lt 1 ]; then
+  echo -e "usage:\n$0 <pattern> [<file>...]"
+  exit 1
+fi
+
+PATTERN="$1"
+shift
+
+sed "s/${PATTERN}/\o033[7m&\o033[0m/g" $@
+
