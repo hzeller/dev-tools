@@ -1,0 +1,187 @@
+#if 0  // Invoke with /bin/sh or simply add executable bit on this file on Unix.
+B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
+#endif
+// Copyright 2026 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Location: https://github.com/hzeller/dev-tools (2026-09-01)
+
+// Script that sorts blocks of headers
+
+#include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+static int usage(const char *progname) {
+  fprintf(stderr, "Usage: %s <file>...\n", progname);
+  return EXIT_FAILURE;
+}
+
+static std::optional<std::string> GetContent(FILE *f) {
+  if (!f) {
+    return std::nullopt;
+  }
+  std::string result;
+  char buf[4096];
+  while (const size_t r = fread(buf, 1, sizeof(buf), f)) {
+    result.append(buf, r);
+  }
+  fclose(f);
+  return result;
+}
+
+static std::optional<std::string> GetContent(const std::string &path) {
+  FILE *const file_to_read = fopen(path.c_str(), "rb");
+  if (!file_to_read) {
+    fprintf(stderr, "%s: can't open: %s\n", path.c_str(), strerror(errno));
+    return std::nullopt;
+  }
+  return GetContent(file_to_read);
+}
+
+static std::string_view ExtractLine(std::string_view content, size_t pos) {
+  const size_t newline = content.find('\n', pos);
+  if (newline == std::string_view::npos) {
+    return content.substr(pos);
+  }
+  return content.substr(pos, newline - pos + 1);
+}
+
+enum class IncludeType {
+  kNone,
+  kAngle,
+  kQuote,
+  kOther,
+};
+
+static IncludeType GetIncludeType(std::string_view line) {
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (!line.starts_with('#')) return IncludeType::kNone;
+  line.remove_prefix(1);
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (!line.starts_with("include")) return IncludeType::kNone;
+  line.remove_prefix(7);
+  if (line.starts_with("_next")) {
+    line.remove_prefix(5);
+  }
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (line.empty()) return IncludeType::kOther;
+  if (line.front() == '<') return IncludeType::kAngle;
+  if (line.front() == '"') return IncludeType::kQuote;
+  return IncludeType::kOther;
+}
+
+static bool ModifyFile(const std::string &file_to_modify) {
+  auto content_or = GetContent(file_to_modify);
+  if (!content_or.has_value()) {
+    return false;
+  }
+  const std::string &content = *content_or;
+
+  const std::string tmp_file_name = file_to_modify + ".tmp";
+  FILE *const tmp_out = fopen(tmp_file_name.c_str(), "wb");
+  if (!tmp_out) {
+    fprintf(stderr, "%s: can't open tmp file %s: %s\n", file_to_modify.c_str(),
+            tmp_file_name.c_str(), strerror(errno));
+    return false;
+  }
+
+  size_t written = 0;
+
+  // Find blocks of lines starting with #include. A block is defined as a
+  // sequence of lines of the same include quote type (e.g. angle bracket vs.
+  // double quote) without a newline or non-include line.
+
+  // Emit file. Lines not starting with #include are emitted as-is.
+  // Lines starting with #include are first remembered as a vector of
+  // string_views representing the lines, then sorted and emitted as such.
+  std::vector<std::string_view> include_block;
+  IncludeType current_block_type = IncludeType::kNone;
+
+  auto flush_includes = [&include_block, &current_block_type, tmp_out,
+                         &written]() {
+    if (include_block.empty()) return;
+    std::sort(include_block.begin(), include_block.end());
+    for (const std::string_view line : include_block) {
+      written += fwrite(line.data(), 1, line.size(), tmp_out);
+    }
+    include_block.clear();
+    current_block_type = IncludeType::kNone;
+  };
+
+  size_t pos = 0;
+  while (pos < content.size()) {
+    const std::string_view line = ExtractLine(content, pos);
+    pos += line.size();
+
+    const IncludeType line_type = GetIncludeType(line);
+
+    if (line_type != IncludeType::kNone) {
+      if (!include_block.empty() && line_type != current_block_type) {
+        flush_includes();
+      }
+      include_block.push_back(line);
+      current_block_type = line_type;
+    } else {
+      flush_includes();
+      written += fwrite(line.data(), 1, line.size(), tmp_out);
+    }
+  }
+  flush_includes();
+
+  const size_t expected_size = content.size();
+  if (written != expected_size) {
+    std::cerr << file_to_modify
+              << ": Unexpected final size "
+                 "original file ("
+              << written << " vs. " << expected_size << ")\n";
+    fclose(tmp_out);
+    unlink(tmp_file_name.c_str());
+    return false;
+  }
+  if (fclose(tmp_out) != 0) {
+    unlink(tmp_file_name.c_str());
+    return false;
+  }
+
+  return rename(tmp_file_name.c_str(), file_to_modify.c_str()) == 0;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc <= 1) {
+    return usage(argv[0]);
+  }
+
+  bool success = true;
+  for (int i = 1; i < argc; ++i) {
+    success &= ModifyFile(argv[i]);
+  }
+  return success ? EXIT_SUCCESS : EXIT_FAILURE;
+}
