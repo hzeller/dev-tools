@@ -21,6 +21,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstddef>
@@ -31,6 +32,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 struct Options {
@@ -95,39 +97,62 @@ static std::optional<std::string> GetContent(const std::string &path) {
   return GetContent(file_to_read);
 }
 
-static size_t FindBestInsertPos(size_t from_marker,
-                                std::string_view content, bool is_angle_inc) {
-  // Depending on what header type to insert, let's put it in the right group.
-
-  // Angle header: just before the first angle header we find.
-  const size_t angle_header_inspos = content.find("\n#include <", from_marker);
-
-  // Quote header: prefer inserting before the second one, as the first one
-  // might be the implementation header.
-  const size_t first_quote_header_inspos = content.find("\n#include \"",
-                                                        from_marker);
-  size_t quote_header_inspos = first_quote_header_inspos;
-  if (quote_header_inspos != std::string::npos) {
-    const size_t second_quote_header =
-        content.find("\n#include \"", quote_header_inspos + 1);
-    if (second_quote_header != std::string::npos) {
-      quote_header_inspos = second_quote_header;
-    }
+static std::string_view ExtractLine(std::string_view content, size_t pos) {
+  const size_t newline = content.find('\n', pos);
+  if (newline == std::string_view::npos) {
+    return content.substr(pos);
   }
-
-  size_t insert_pos = is_angle_inc ? angle_header_inspos : quote_header_inspos;
-  if (insert_pos == std::string::npos) {
-    insert_pos = is_angle_inc ? first_quote_header_inspos : angle_header_inspos;
-  }
-  if (insert_pos == std::string::npos) {
-    return from_marker;
-  }
-
-  // All our searches start with the preceeding newline; insert where '#' is.
-  return insert_pos + 1;
+  return content.substr(pos, newline - pos + 1);
 }
 
-static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
+enum class IncludeType {
+  kNone,
+  kAngleC,    // Standard C headers ending with .h (e.g. <stdio.h>)
+  kAngleCpp,  // C++ headers not ending in .h (e.g. <vector>)
+  kQuote,
+  kOther,
+};
+
+static IncludeType GetIncludeType(std::string_view line) {
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (!line.starts_with('#')) return IncludeType::kNone;
+  line.remove_prefix(1);
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (!line.starts_with("include")) return IncludeType::kNone;
+  line.remove_prefix(7);
+  if (line.starts_with("_next")) {
+    line.remove_prefix(5);
+  }
+  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+    line.remove_prefix(1);
+  }
+  if (line.empty()) return IncludeType::kOther;
+  if (line.front() == '<') {
+    return line.find(".h>") != std::string_view::npos ? IncludeType::kAngleC
+                                                     : IncludeType::kAngleCpp;
+  }
+  if (line.front() == '"') return IncludeType::kQuote;
+  return IncludeType::kOther;
+}
+
+static int GetTypeRank(IncludeType type) {
+  switch (type) {
+    case IncludeType::kAngleC:
+      return 1;
+    case IncludeType::kAngleCpp:
+      return 2;
+    case IncludeType::kQuote:
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+static bool ModifyFile(const std::string &file_to_modify,
                        const std::string &insert_header,
                        const Options &options) {
   auto content_or = GetContent(file_to_modify);
@@ -150,7 +175,6 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
             insert_header.c_str(), options.explanation.c_str());
   }
 
-
   size_t insert_mark = 0;
   if (auto m = content.find(options.insert_marker); m != std::string::npos) {
     insert_mark = m + options.insert_marker.length();
@@ -158,23 +182,106 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
     while (insert_mark < content.length() && content[insert_mark] != '\n') {
       ++insert_mark;
     }
-    ++insert_mark;
+    if (insert_mark < content.length()) {
+      ++insert_mark;
+    }
   }
 
-  const size_t insert_pos = FindBestInsertPos(insert_mark, content, is_angle_inc);
+  const std::string line_to_insert = insert_header + "\n";
+  const IncludeType target_type = GetIncludeType(line_to_insert);
 
-  // Re-assemble file.
+  bool matching_block_exists = false;
+  size_t scan_pos = insert_mark;
+  while (scan_pos < content.size()) {
+    const std::string_view line = ExtractLine(content, scan_pos);
+    scan_pos += line.size();
+    if (GetIncludeType(line) == target_type) {
+      matching_block_exists = true;
+      break;
+    }
+  }
+
   const std::string tmp_file_name = file_to_modify + ".tmp";
   FILE *const tmp_out = fopen(tmp_file_name.c_str(), "wb");
+  if (!tmp_out) {
+    fprintf(stderr, "%s: can't open tmp file %s: %s\n", file_to_modify.c_str(),
+            tmp_file_name.c_str(), strerror(errno));
+    return false;
+  }
 
   size_t written = 0;
-  // Up to first header.
-  written += fwrite(content.data(), 1, insert_pos, tmp_out);
+  if (insert_mark > 0) {
+    written += fwrite(content.data(), 1, insert_mark, tmp_out);
+  }
 
-  written += fwrite(insert_header.data(), 1, insert_header.size(), tmp_out);
-  written += fwrite("\n", 1, 1, tmp_out);
-  written += fwrite(content.data() + insert_pos, 1, content.size() - insert_pos,
-                    tmp_out);
+  std::vector<std::string_view> include_block;
+  IncludeType current_block_type = IncludeType::kNone;
+  bool inserted = false;
+  bool target_block_modified = false;
+
+  auto flush_includes = [&include_block, &current_block_type,
+                         &target_block_modified, tmp_out, &written]() {
+    if (include_block.empty()) return;
+    if (target_block_modified) {
+      std::sort(include_block.begin(), include_block.end());
+      target_block_modified = false;
+    }
+    for (const std::string_view line : include_block) {
+      written += fwrite(line.data(), 1, line.size(), tmp_out);
+    }
+    include_block.clear();
+    current_block_type = IncludeType::kNone;
+  };
+
+  size_t pos = insert_mark;
+  while (pos < content.size()) {
+    const std::string_view line = ExtractLine(content, pos);
+    pos += line.size();
+
+    const IncludeType line_type = GetIncludeType(line);
+
+    if (line_type != IncludeType::kNone) {
+      if (!include_block.empty() && line_type != current_block_type) {
+        flush_includes();
+      }
+
+      if (!inserted) {
+        if (matching_block_exists) {
+          if (line_type == target_type) {
+            include_block.push_back(line_to_insert);
+            inserted = true;
+            target_block_modified = true;
+          }
+        } else {
+          if (GetTypeRank(line_type) > GetTypeRank(target_type)) {
+            written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+            inserted = true;
+          }
+        }
+      }
+
+      include_block.push_back(line);
+      current_block_type = line_type;
+    } else {
+      if (!inserted && !matching_block_exists && !include_block.empty()) {
+        if (GetTypeRank(current_block_type) < GetTypeRank(target_type)) {
+          flush_includes();
+          written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+          inserted = true;
+        }
+      }
+      flush_includes();
+      written += fwrite(line.data(), 1, line.size(), tmp_out);
+    }
+  }
+
+  if (!inserted) {
+    flush_includes();
+    written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+    inserted = true;
+  } else {
+    flush_includes();
+  }
 
   const size_t expected_size = content.size() + insert_header.size() + 1;
   if (written != expected_size) {
@@ -182,9 +289,12 @@ static bool ModifyFile(const std::string &file_to_modify, bool is_angle_inc,
               << ": Unexpected final size "
                  "original file ("
               << written << " vs. " << expected_size << ")\n";
+    fclose(tmp_out);
+    unlink(tmp_file_name.c_str());
     return false;
   }
   if (fclose(tmp_out) != 0) {
+    unlink(tmp_file_name.c_str());
     return false;
   }
 
@@ -251,7 +361,7 @@ int main(int argc, char *argv[]) {
 
   bool success = true;
   for (int i = start_files; i < argc; ++i) {
-    success &= ModifyFile(argv[i], is_angle_inc, insert_header, options);
+    success &= ModifyFile(argv[i], insert_header, options);
   }
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
