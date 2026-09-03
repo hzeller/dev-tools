@@ -70,7 +70,8 @@ static std::string_view ExtractLine(std::string_view content, size_t pos) {
 
 enum class IncludeType {
   kNone,
-  kAngle,
+  kAngleC,    // Standard C headers ending with .h (e.g. <stdio.h>)
+  kAngleCpp,  // C++ headers not ending in .h (e.g. <vector>)
   kQuote,
   kOther,
 };
@@ -93,7 +94,10 @@ static IncludeType GetIncludeType(std::string_view line) {
     line.remove_prefix(1);
   }
   if (line.empty()) return IncludeType::kOther;
-  if (line.front() == '<') return IncludeType::kAngle;
+  if (line.front() == '<') {
+    return line.find(".h>") != std::string_view::npos ? IncludeType::kAngleC
+                                                     : IncludeType::kAngleCpp;
+  }
   if (line.front() == '"') return IncludeType::kQuote;
   return IncludeType::kOther;
 }
@@ -116,8 +120,8 @@ static bool ModifyFile(const std::string &file_to_modify) {
   size_t written = 0;
 
   // Find blocks of lines starting with #include. A block is defined as a
-  // sequence of lines of the same include quote type (e.g. angle bracket vs.
-  // double quote) without a newline or non-include line.
+  // sequence of lines of the same include type (e.g. C angle bracket vs.
+  // C++ angle bracket vs. double quote) without a newline or non-include line.
 
   // Emit file. Lines not starting with #include are emitted as-is.
   // Lines starting with #include are first remembered as a vector of
