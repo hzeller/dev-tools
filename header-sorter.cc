@@ -34,7 +34,7 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <vector>
 
 static int usage(const char *progname) {
-  fprintf(stderr, "Usage: %s <file>...\n", progname);
+  fprintf(stderr, "Usage: %s [-s c|c++|quote] <file>...\n", progname);
   return EXIT_FAILURE;
 }
 
@@ -76,6 +76,25 @@ enum class IncludeType {
   kOther,
 };
 
+struct Options {
+  bool sort_c = false;
+  bool sort_cpp = false;
+  bool sort_quote = false;
+};
+
+static bool ShouldSort(IncludeType type, const Options &options) {
+  switch (type) {
+    case IncludeType::kAngleC:
+      return options.sort_c;
+    case IncludeType::kAngleCpp:
+      return options.sort_cpp;
+    case IncludeType::kQuote:
+      return options.sort_quote;
+    default:
+      return false;
+  }
+}
+
 static IncludeType GetIncludeType(std::string_view line) {
   while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
     line.remove_prefix(1);
@@ -102,7 +121,8 @@ static IncludeType GetIncludeType(std::string_view line) {
   return IncludeType::kOther;
 }
 
-static bool ModifyFile(const std::string &file_to_modify) {
+static bool ModifyFile(const std::string &file_to_modify,
+                       const Options &options) {
   auto content_or = GetContent(file_to_modify);
   if (!content_or.has_value()) {
     return false;
@@ -125,14 +145,17 @@ static bool ModifyFile(const std::string &file_to_modify) {
 
   // Emit file. Lines not starting with #include are emitted as-is.
   // Lines starting with #include are first remembered as a vector of
-  // string_views representing the lines, then sorted and emitted as such.
+  // string_views representing the lines, then sorted (if enabled for the
+  // block type) and emitted.
   std::vector<std::string_view> include_block;
   IncludeType current_block_type = IncludeType::kNone;
 
-  auto flush_includes = [&include_block, &current_block_type, tmp_out,
-                         &written]() {
+  auto flush_includes = [&include_block, &current_block_type, tmp_out, &written,
+                         &options]() {
     if (include_block.empty()) return;
-    std::sort(include_block.begin(), include_block.end());
+    if (ShouldSort(current_block_type, options)) {
+      std::sort(include_block.begin(), include_block.end());
+    }
     for (const std::string_view line : include_block) {
       written += fwrite(line.data(), 1, line.size(), tmp_out);
     }
@@ -179,13 +202,45 @@ static bool ModifyFile(const std::string &file_to_modify) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc <= 1) {
+  Options options;
+  bool s_flag_seen = false;
+
+  int opt;
+  while ((opt = getopt(argc, argv, "s:")) != -1) {
+    switch (opt) {
+      case 's': {
+        const std::string_view arg = optarg;
+        if (arg == "c") {
+          options.sort_c = true;
+        } else if (arg == "c++") {
+          options.sort_cpp = true;
+        } else if (arg == "quote") {
+          options.sort_quote = true;
+        } else {
+          fprintf(stderr, "Unknown header block type for -s: %s\n", optarg);
+          return usage(argv[0]);
+        }
+        s_flag_seen = true;
+        break;
+      }
+      default:
+        return usage(argv[0]);
+    }
+  }
+
+  if (!s_flag_seen) {
+    options.sort_c = true;
+    options.sort_cpp = true;
+    options.sort_quote = true;
+  }
+
+  if (optind >= argc) {
     return usage(argv[0]);
   }
 
   bool success = true;
-  for (int i = 1; i < argc; ++i) {
-    success &= ModifyFile(argv[i]);
+  for (int i = optind; i < argc; ++i) {
+    success &= ModifyFile(argv[i], options);
   }
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
