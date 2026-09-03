@@ -56,7 +56,7 @@ EOF
 
 "${INSERT_HEADER}" '<vector>' "${TMPDIR}/t1.cc"
 
-EXPECTED_TEST1=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <unistd.h>
 
 #include <string>
@@ -66,7 +66,7 @@ EXPECTED_TEST1=$(cat <<'EOF'
 #include "a_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/t1.cc" "${EXPECTED_TEST1}"
+assert_file_content "${TMPDIR}/t1.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert C header into C block and sort that block only"
 cat <<'EOF' > "${TMPDIR}/t2.cc"
@@ -77,14 +77,14 @@ EOF
 
 "${INSERT_HEADER}" '<stdio.h>' "${TMPDIR}/t2.cc"
 
-EXPECTED_TEST2=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <stdio.h>
 #include <unistd.h>
 
 #include <vector>
 EOF
 )
-assert_file_content "${TMPDIR}/t2.cc" "${EXPECTED_TEST2}"
+assert_file_content "${TMPDIR}/t2.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert quote header into quote block and sort that block only"
 cat <<'EOF' > "${TMPDIR}/t3.cc"
@@ -96,7 +96,7 @@ EOF
 
 "${INSERT_HEADER}" 'm_header.h' "${TMPDIR}/t3.cc"
 
-EXPECTED_TEST3=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <vector>
 
 #include "a_header.h"
@@ -104,7 +104,7 @@ EXPECTED_TEST3=$(cat <<'EOF'
 #include "z_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/t3.cc" "${EXPECTED_TEST3}"
+assert_file_content "${TMPDIR}/t3.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert own header at top of file when no own header exists"
 cat <<'EOF' > "${TMPDIR}/my_tool.cc"
@@ -115,7 +115,7 @@ EOF
 
 "${INSERT_HEADER}" 'my_tool.h' "${TMPDIR}/my_tool.cc"
 
-EXPECTED_TEST4=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "my_tool.h"
 
 #include <vector>
@@ -123,7 +123,7 @@ EXPECTED_TEST4=$(cat <<'EOF'
 #include "a_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/my_tool.cc" "${EXPECTED_TEST4}"
+assert_file_content "${TMPDIR}/my_tool.cc" "${EXPECTED_OUT}"
 
 echo "Test: Preserve own header at top when inserting a new quote header"
 cat <<'EOF' > "${TMPDIR}/my_service.cc"
@@ -136,7 +136,7 @@ EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/my_service.cc"
 
-EXPECTED_TEST5=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "my_service.h"
 
 #include <vector>
@@ -145,7 +145,7 @@ EXPECTED_TEST5=$(cat <<'EOF'
 #include "z_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/my_service.cc" "${EXPECTED_TEST5}"
+assert_file_content "${TMPDIR}/my_service.cc" "${EXPECTED_OUT}"
 
 echo "Test: Header already present (file remains untouched)"
 cat <<'EOF' > "${TMPDIR}/t6.cc"
@@ -154,11 +154,11 @@ EOF
 
 "${INSERT_HEADER}" -q '<vector>' "${TMPDIR}/t6.cc"
 
-EXPECTED_TEST6=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <vector>
 EOF
 )
-assert_file_content "${TMPDIR}/t6.cc" "${EXPECTED_TEST6}"
+assert_file_content "${TMPDIR}/t6.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert own header foo.h at top of test file foo_test.cc"
 cat <<'EOF' > "${TMPDIR}/foo_test.cc"
@@ -169,7 +169,7 @@ EOF
 
 "${INSERT_HEADER}" 'foo.h' "${TMPDIR}/foo_test.cc"
 
-EXPECTED_TEST7=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "foo.h"
 
 #include <vector>
@@ -177,7 +177,7 @@ EXPECTED_TEST7=$(cat <<'EOF'
 #include "a_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/foo_test.cc" "${EXPECTED_TEST7}"
+assert_file_content "${TMPDIR}/foo_test.cc" "${EXPECTED_OUT}"
 
 echo "Test: Preserve own header foo.h at top of foo_test.cc when inserting a quote header"
 cat <<'EOF' > "${TMPDIR}/bar_test.cc"
@@ -190,7 +190,7 @@ EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar_test.cc"
 
-EXPECTED_TEST8=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "bar.h"
 
 #include <vector>
@@ -199,7 +199,7 @@ EXPECTED_TEST8=$(cat <<'EOF'
 #include "z_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/bar_test.cc" "${EXPECTED_TEST8}"
+assert_file_content "${TMPDIR}/bar_test.cc" "${EXPECTED_OUT}"
 
 echo "Test: Create new block for missing cpp category between existing blocks with newline separation"
 cat <<'EOF' > "${TMPDIR}/new_block_cpp.cc"
@@ -210,7 +210,7 @@ EOF
 
 "${INSERT_HEADER}" '<vector>' "${TMPDIR}/new_block_cpp.cc"
 
-EXPECTED_TEST9=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <stdio.h>
 
 #include <vector>
@@ -218,7 +218,7 @@ EXPECTED_TEST9=$(cat <<'EOF'
 #include "a_header.h"
 EOF
 )
-assert_file_content "${TMPDIR}/new_block_cpp.cc" "${EXPECTED_TEST9}"
+assert_file_content "${TMPDIR}/new_block_cpp.cc" "${EXPECTED_OUT}"
 
 echo "Test: Create new block for missing c category before existing blocks with newline separation"
 cat <<'EOF' > "${TMPDIR}/new_block_c.cc"
@@ -231,7 +231,7 @@ EOF
 
 "${INSERT_HEADER}" '<stdio.h>' "${TMPDIR}/new_block_c.cc"
 
-EXPECTED_TEST10=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <stdio.h>
 
 #include <vector>
@@ -241,7 +241,7 @@ EXPECTED_TEST10=$(cat <<'EOF'
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/new_block_c.cc" "${EXPECTED_TEST10}"
+assert_file_content "${TMPDIR}/new_block_c.cc" "${EXPECTED_OUT}"
 
 echo "Test: Create new block for missing quote category after existing blocks with newline separation"
 cat <<'EOF' > "${TMPDIR}/new_block_quote.cc"
@@ -254,7 +254,7 @@ EOF
 
 "${INSERT_HEADER}" 'b_header.h' "${TMPDIR}/new_block_quote.cc"
 
-EXPECTED_TEST11=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <stdio.h>
 
 #include <vector>
@@ -264,7 +264,7 @@ EXPECTED_TEST11=$(cat <<'EOF'
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/new_block_quote.cc" "${EXPECTED_TEST11}"
+assert_file_content "${TMPDIR}/new_block_quote.cc" "${EXPECTED_OUT}"
 
 echo "Test: Create new quote block when only an own header exists"
 cat <<'EOF' > "${TMPDIR}/own_only.cc"
@@ -275,7 +275,7 @@ EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/own_only.cc"
 
-EXPECTED_TEST12=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "own_only.h"
 
 #include "a_header.h"
@@ -283,7 +283,7 @@ EXPECTED_TEST12=$(cat <<'EOF'
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/own_only.cc" "${EXPECTED_TEST12}"
+assert_file_content "${TMPDIR}/own_only.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert quote-header at the beginning of a file"
 cat <<'EOF' > "${TMPDIR}/bar.cc"
@@ -293,13 +293,13 @@ EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar.cc"
 
-EXPECTED_TEST13=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "a_header.h"
 
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert header at the beginning of a file, no pre-existing empty line"
 cat <<'EOF' > "${TMPDIR}/bar.cc"
@@ -308,13 +308,13 @@ EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar.cc"
 
-EXPECTED_TEST13=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include "a_header.h"
 
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_OUT}"
 
 echo "Test: Insert cpp-header at the beginning of a file"
 cat <<'EOF' > "${TMPDIR}/bar.cc"
@@ -323,12 +323,49 @@ EOF
 
 "${INSERT_HEADER}" '<vector>' "${TMPDIR}/bar.cc"
 
-EXPECTED_TEST13=$(cat <<'EOF'
+EXPECTED_OUT=$(cat <<'EOF'
 #include <vector>
 
 int here_is_some_code();
 EOF
 )
-assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_OUT}"
+
+echo "Test: Insert cpp-header after c-header regression"
+cat <<'EOF' > "${TMPDIR}/bar.cc"
+// some comment
+/*
+   other comment
+*/
+#include "bar.h"
+
+#include <stddef.h>
+
+#if something
+#endif
+
+int here_is_some_code();
+EOF
+
+"${INSERT_HEADER}" '<vector>' "${TMPDIR}/bar.cc"
+
+EXPECTED_OUT=$(cat <<'EOF'
+// some comment
+/*
+   other comment
+*/
+#include "bar.h"
+
+#include <stddef.h>
+
+#include <vector>
+
+#if something
+#endif
+
+int here_is_some_code();
+EOF
+)
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_OUT}"
 
 echo "ALL insert-header tests PASSED!"
