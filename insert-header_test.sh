@@ -285,7 +285,7 @@ EOF
 )
 assert_file_content "${TMPDIR}/own_only.cc" "${EXPECTED_TEST12}"
 
-echo "Test: Insert header at the beginning of a file"
+echo "Test: Insert quote-header at the beginning of a file"
 cat <<'EOF' > "${TMPDIR}/bar.cc"
 
 int here_is_some_code();
@@ -310,6 +310,21 @@ EOF
 
 EXPECTED_TEST13=$(cat <<'EOF'
 #include "a_header.h"
+
+int here_is_some_code();
+EOF
+)
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
+
+echo "Test: Insert cpp-header at the beginning of a file"
+cat <<'EOF' > "${TMPDIR}/bar.cc"
+int here_is_some_code();
+EOF
+
+"${INSERT_HEADER}" '<vector>' "${TMPDIR}/bar.cc"
+
+EXPECTED_TEST13=$(cat <<'EOF'
+#include <vector>
 
 int here_is_some_code();
 EOF
