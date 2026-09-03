@@ -33,48 +33,12 @@ B=${0%%.cc}; [ "$B" -nt "$0" ] || c++ -std=c++20 -o"$B" "$0" && exec "$B" "$@";
 #include <string_view>
 #include <vector>
 
+#include "header-utils.h"
+
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s [-s c|c++|quote] <file>...\n", progname);
   return EXIT_FAILURE;
 }
-
-static std::optional<std::string> GetContent(FILE *f) {
-  if (!f) {
-    return std::nullopt;
-  }
-  std::string result;
-  char buf[4096];
-  while (const size_t r = fread(buf, 1, sizeof(buf), f)) {
-    result.append(buf, r);
-  }
-  fclose(f);
-  return result;
-}
-
-static std::optional<std::string> GetContent(const std::string &path) {
-  FILE *const file_to_read = fopen(path.c_str(), "rb");
-  if (!file_to_read) {
-    fprintf(stderr, "%s: can't open: %s\n", path.c_str(), strerror(errno));
-    return std::nullopt;
-  }
-  return GetContent(file_to_read);
-}
-
-static std::string_view ExtractLine(std::string_view content, size_t pos) {
-  const size_t newline = content.find('\n', pos);
-  if (newline == std::string_view::npos) {
-    return content.substr(pos);
-  }
-  return content.substr(pos, newline - pos + 1);
-}
-
-enum class IncludeType {
-  kNone,
-  kAngleC,    // Standard C headers ending with .h (e.g. <stdio.h>)
-  kAngleCpp,  // C++ headers not ending in .h (e.g. <vector>)
-  kQuote,
-  kOther,
-};
 
 struct Options {
   bool sort_c = false;
@@ -93,32 +57,6 @@ static bool ShouldSort(IncludeType type, const Options &options) {
     default:
       return false;
   }
-}
-
-static IncludeType GetIncludeType(std::string_view line) {
-  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
-    line.remove_prefix(1);
-  }
-  if (!line.starts_with('#')) return IncludeType::kNone;
-  line.remove_prefix(1);
-  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
-    line.remove_prefix(1);
-  }
-  if (!line.starts_with("include")) return IncludeType::kNone;
-  line.remove_prefix(7);
-  if (line.starts_with("_next")) {
-    line.remove_prefix(5);
-  }
-  while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
-    line.remove_prefix(1);
-  }
-  if (line.empty()) return IncludeType::kOther;
-  if (line.front() == '<') {
-    return line.find(".h>") != std::string_view::npos ? IncludeType::kAngleC
-                                                     : IncludeType::kAngleCpp;
-  }
-  if (line.front() == '"') return IncludeType::kQuote;
-  return IncludeType::kOther;
 }
 
 static bool ModifyFile(const std::string &file_to_modify,
