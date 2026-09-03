@@ -117,6 +117,7 @@ EOF
 
 EXPECTED_TEST4=$(cat <<'EOF'
 #include "my_tool.h"
+
 #include <vector>
 
 #include "a_header.h"
@@ -170,6 +171,7 @@ EOF
 
 EXPECTED_TEST7=$(cat <<'EOF'
 #include "foo.h"
+
 #include <vector>
 
 #include "a_header.h"
@@ -198,5 +200,77 @@ EXPECTED_TEST8=$(cat <<'EOF'
 EOF
 )
 assert_file_content "${TMPDIR}/bar_test.cc" "${EXPECTED_TEST8}"
+
+echo "Test: Create new block for missing cpp category between existing blocks with newline separation"
+cat <<'EOF' > "${TMPDIR}/new_block_cpp.cc"
+#include <stdio.h>
+
+#include "a_header.h"
+EOF
+
+"${INSERT_HEADER}" '<vector>' "${TMPDIR}/new_block_cpp.cc"
+
+EXPECTED_TEST9=$(cat <<'EOF'
+#include <stdio.h>
+
+#include <vector>
+
+#include "a_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/new_block_cpp.cc" "${EXPECTED_TEST9}"
+
+echo "Test: Create new block for missing c category before existing blocks with newline separation"
+cat <<'EOF' > "${TMPDIR}/new_block_c.cc"
+#include <vector>
+
+#include "a_header.h"
+EOF
+
+"${INSERT_HEADER}" '<stdio.h>' "${TMPDIR}/new_block_c.cc"
+
+EXPECTED_TEST10=$(cat <<'EOF'
+#include <stdio.h>
+
+#include <vector>
+
+#include "a_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/new_block_c.cc" "${EXPECTED_TEST10}"
+
+echo "Test: Create new block for missing quote category after existing blocks with newline separation"
+cat <<'EOF' > "${TMPDIR}/new_block_quote.cc"
+#include <stdio.h>
+
+#include <vector>
+EOF
+
+"${INSERT_HEADER}" 'b_header.h' "${TMPDIR}/new_block_quote.cc"
+
+EXPECTED_TEST11=$(cat <<'EOF'
+#include <stdio.h>
+
+#include <vector>
+
+#include "b_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/new_block_quote.cc" "${EXPECTED_TEST11}"
+
+echo "Test: Create new quote block when only an own header exists"
+cat <<'EOF' > "${TMPDIR}/own_only.cc"
+#include "own_only.h"
+EOF
+
+"${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/own_only.cc"
+
+EXPECTED_TEST12=$(cat <<'EOF'
+#include "own_only.h"
+
+#include "a_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/own_only.cc" "${EXPECTED_TEST12}"
 
 echo "ALL insert-header tests PASSED!"

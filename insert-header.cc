@@ -119,6 +119,7 @@ static bool ModifyFile(const std::string &file_to_modify,
   const IncludeType target_type = GetIncludeType(line_to_insert, file_stem, true);
 
   bool matching_block_exists = false;
+  bool higher_rank_block_exists = false;
   bool first_include_seen = false;
   size_t scan_pos = insert_mark;
   while (scan_pos < content.size()) {
@@ -130,7 +131,9 @@ static bool ModifyFile(const std::string &file_to_modify,
       first_include_seen = true;
       if (lt == target_type) {
         matching_block_exists = true;
-        break;
+      }
+      if (GetTypeRank(lt) > GetTypeRank(target_type)) {
+        higher_rank_block_exists = true;
       }
     }
   }
@@ -152,9 +155,11 @@ static bool ModifyFile(const std::string &file_to_modify,
   IncludeType current_block_type = IncludeType::kNone;
   bool inserted = false;
   bool target_block_modified = false;
+  bool last_flushed_had_includes = false;
 
   auto flush_includes = [&include_block, &current_block_type,
-                         &target_block_modified, tmp_out, &written]() {
+                         &target_block_modified, &last_flushed_had_includes,
+                         tmp_out, &written]() {
     if (include_block.empty()) return;
     if (target_block_modified) {
       std::sort(include_block.begin(), include_block.end());
@@ -165,6 +170,20 @@ static bool ModifyFile(const std::string &file_to_modify,
     }
     include_block.clear();
     current_block_type = IncludeType::kNone;
+    last_flushed_had_includes = true;
+  };
+
+  auto emit_new_target_block = [&](bool followed_by_include) {
+    if (inserted) return;
+    if (last_flushed_had_includes || !include_block.empty()) {
+      written += fwrite("\n", 1, 1, tmp_out);
+    }
+    written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+    if (followed_by_include) {
+      written += fwrite("\n", 1, 1, tmp_out);
+    }
+    inserted = true;
+    last_flushed_had_includes = true;
   };
 
   first_include_seen = false;
@@ -189,10 +208,9 @@ static bool ModifyFile(const std::string &file_to_modify,
             inserted = true;
             target_block_modified = true;
           }
-        } else {
+        } else if (higher_rank_block_exists) {
           if (GetTypeRank(line_type) > GetTypeRank(target_type)) {
-            written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
-            inserted = true;
+            emit_new_target_block(/*followed_by_include=*/true);
           }
         }
       }
@@ -200,36 +218,21 @@ static bool ModifyFile(const std::string &file_to_modify,
       include_block.push_back(line);
       current_block_type = line_type;
     } else {
-      if (!inserted && !matching_block_exists && !include_block.empty()) {
-        if (GetTypeRank(current_block_type) < GetTypeRank(target_type)) {
-          flush_includes();
-          written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
-          inserted = true;
-        }
-      }
       flush_includes();
       written += fwrite(line.data(), 1, line.size(), tmp_out);
+      if (line == "\n" || line == "\r\n") {
+        last_flushed_had_includes = false;
+      }
     }
   }
 
   if (!inserted) {
     flush_includes();
-    written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
-    inserted = true;
+    emit_new_target_block(/*followed_by_include=*/false);
   } else {
     flush_includes();
   }
 
-  const size_t expected_size = content.size() + insert_header.size() + 1;
-  if (written != expected_size) {
-    std::cerr << file_to_modify
-              << ": Unexpected final size "
-                 "original file ("
-              << written << " vs. " << expected_size << ")\n";
-    fclose(tmp_out);
-    unlink(tmp_file_name.c_str());
-    return false;
-  }
   if (fclose(tmp_out) != 0) {
     unlink(tmp_file_name.c_str());
     return false;
