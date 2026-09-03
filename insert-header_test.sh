@@ -159,4 +159,44 @@ EOF
 )
 assert_file_content "${TMPDIR}/t6.cc" "${EXPECTED_TEST6}"
 
+echo "Test: Insert own header foo.h at top of test file foo_test.cc"
+cat <<'EOF' > "${TMPDIR}/foo_test.cc"
+#include <vector>
+
+#include "a_header.h"
+EOF
+
+"${INSERT_HEADER}" 'foo.h' "${TMPDIR}/foo_test.cc"
+
+EXPECTED_TEST7=$(cat <<'EOF'
+#include "foo.h"
+#include <vector>
+
+#include "a_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/foo_test.cc" "${EXPECTED_TEST7}"
+
+echo "Test: Preserve own header foo.h at top of foo_test.cc when inserting a quote header"
+cat <<'EOF' > "${TMPDIR}/bar_test.cc"
+#include "bar.h"
+
+#include <vector>
+
+#include "z_header.h"
+EOF
+
+"${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar_test.cc"
+
+EXPECTED_TEST8=$(cat <<'EOF'
+#include "bar.h"
+
+#include <vector>
+
+#include "a_header.h"
+#include "z_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/bar_test.cc" "${EXPECTED_TEST8}"
+
 echo "ALL insert-header tests PASSED!"

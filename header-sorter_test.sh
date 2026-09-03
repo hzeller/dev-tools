@@ -138,4 +138,21 @@ EOF
 )
 assert_file_content "${TMPDIR}/my_tool.cc" "${EXPECTED_TEST4}"
 
+echo "Test: Preserving kOwnHeader for test files (foo_test.cc matching foo.h)"
+cat <<'EOF' > "${TMPDIR}/foo_test.cc"
+#include "foo.h"
+#include "z_header.h"
+#include "a_header.h"
+EOF
+
+"${HEADER_SORTER}" "${TMPDIR}/foo_test.cc"
+
+EXPECTED_TEST5=$(cat <<'EOF'
+#include "foo.h"
+#include "a_header.h"
+#include "z_header.h"
+EOF
+)
+assert_file_content "${TMPDIR}/foo_test.cc" "${EXPECTED_TEST5}"
+
 echo "ALL header-sorter tests PASSED!"

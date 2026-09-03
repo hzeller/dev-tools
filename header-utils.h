@@ -68,16 +68,29 @@ inline std::string_view GetHeaderTarget(std::string_view line) {
   return line.substr(start + 1, end - start - 1);
 }
 
+inline std::string_view GetBaseStem(std::string_view stem) {
+  static constexpr std::string_view kSuffixes[] = {
+      "_test",      "-test",
+      "_unittest",  "-unittest",
+      "_regtest",   "-regtest",
+      "_benchmark", "-benchmark",
+      "_bench",     "-bench",
+  };
+  for (const std::string_view suffix : kSuffixes) {
+    if (stem.ends_with(suffix)) {
+      return stem.substr(0, stem.size() - suffix.size());
+    }
+  }
+  return stem;
+}
+
 inline bool IsSimilarName(std::string_view header_target,
                           std::string_view file_stem) {
   if (file_stem.empty() || header_target.empty()) return false;
-  std::string_view header_stem = GetStem(header_target);
+  const std::string_view header_stem = GetStem(header_target);
   if (header_stem == file_stem) return true;
-  if (file_stem.ends_with("_test")) {
-    if (header_stem == file_stem.substr(0, file_stem.size() - 5)) return true;
-  } else if (file_stem.ends_with("_unittest")) {
-    if (header_stem == file_stem.substr(0, file_stem.size() - 9)) return true;
-  }
+  const std::string_view base_stem = GetBaseStem(file_stem);
+  if (base_stem != file_stem && header_stem == base_stem) return true;
   return false;
 }
 
