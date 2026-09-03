@@ -101,28 +101,37 @@ static bool ModifyFile(const std::string &file_to_modify,
   }
 
   size_t insert_mark = 0;
-  if (auto m = content.find(options.insert_marker); m != std::string::npos) {
-    insert_mark = m + options.insert_marker.length();
-    // Insert after the line matching this
-    while (insert_mark < content.length() && content[insert_mark] != '\n') {
-      ++insert_mark;
-    }
-    if (insert_mark < content.length()) {
-      ++insert_mark;
+  if (!options.insert_marker.empty()) {
+    if (auto m = content.find(options.insert_marker); m != std::string::npos) {
+      insert_mark = m + options.insert_marker.length();
+      // Insert after the line matching this
+      while (insert_mark < content.length() && content[insert_mark] != '\n') {
+        ++insert_mark;
+      }
+      if (insert_mark < content.length()) {
+        ++insert_mark;
+      }
     }
   }
 
+  const std::string_view file_stem = GetStem(file_to_modify);
   const std::string line_to_insert = insert_header + "\n";
-  const IncludeType target_type = GetIncludeType(line_to_insert);
+  const IncludeType target_type = GetIncludeType(line_to_insert, file_stem, true);
 
   bool matching_block_exists = false;
+  bool first_include_seen = false;
   size_t scan_pos = insert_mark;
   while (scan_pos < content.size()) {
     const std::string_view line = ExtractLine(content, scan_pos);
     scan_pos += line.size();
-    if (GetIncludeType(line) == target_type) {
-      matching_block_exists = true;
-      break;
+    const bool is_first = !first_include_seen;
+    const IncludeType lt = GetIncludeType(line, file_stem, is_first);
+    if (lt != IncludeType::kNone) {
+      first_include_seen = true;
+      if (lt == target_type) {
+        matching_block_exists = true;
+        break;
+      }
     }
   }
 
@@ -158,14 +167,17 @@ static bool ModifyFile(const std::string &file_to_modify,
     current_block_type = IncludeType::kNone;
   };
 
+  first_include_seen = false;
   size_t pos = insert_mark;
   while (pos < content.size()) {
     const std::string_view line = ExtractLine(content, pos);
     pos += line.size();
 
-    const IncludeType line_type = GetIncludeType(line);
+    const bool is_first = !first_include_seen;
+    const IncludeType line_type = GetIncludeType(line, file_stem, is_first);
 
     if (line_type != IncludeType::kNone) {
+      first_include_seen = true;
       if (!include_block.empty() && line_type != current_block_type) {
         flush_includes();
       }

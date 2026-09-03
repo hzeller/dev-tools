@@ -48,6 +48,8 @@ struct Options {
 
 static bool ShouldSort(IncludeType type, const Options &options) {
   switch (type) {
+    case IncludeType::kOwnHeader:
+      return false;
     case IncludeType::kAngleC:
       return options.sort_c;
     case IncludeType::kAngleCpp:
@@ -76,6 +78,8 @@ static bool ModifyFile(const std::string &file_to_modify,
   }
 
   size_t written = 0;
+  const std::string_view file_stem = GetStem(file_to_modify);
+  bool first_include_seen = false;
 
   // Find blocks of lines starting with #include. A block is defined as a
   // sequence of lines of the same include type (e.g. C angle bracket vs.
@@ -106,9 +110,11 @@ static bool ModifyFile(const std::string &file_to_modify,
     const std::string_view line = ExtractLine(content, pos);
     pos += line.size();
 
-    const IncludeType line_type = GetIncludeType(line);
+    const bool is_first = !first_include_seen;
+    const IncludeType line_type = GetIncludeType(line, file_stem, is_first);
 
     if (line_type != IncludeType::kNone) {
+      first_include_seen = true;
       if (!include_block.empty() && line_type != current_block_type) {
         flush_includes();
       }
