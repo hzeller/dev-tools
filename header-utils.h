@@ -84,6 +84,10 @@ inline std::string_view GetBaseStem(std::string_view stem) {
   return stem;
 }
 
+inline bool IsBlankLine(std::string_view line) {
+  return line.find_first_not_of(" \t\r\n") == std::string_view::npos;
+}
+
 inline bool IsSimilarName(std::string_view header_target,
                           std::string_view file_stem) {
   if (file_stem.empty() || header_target.empty()) return false;

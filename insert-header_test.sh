@@ -225,6 +225,8 @@ cat <<'EOF' > "${TMPDIR}/new_block_c.cc"
 #include <vector>
 
 #include "a_header.h"
+
+int here_is_some_code();
 EOF
 
 "${INSERT_HEADER}" '<stdio.h>' "${TMPDIR}/new_block_c.cc"
@@ -235,6 +237,8 @@ EXPECTED_TEST10=$(cat <<'EOF'
 #include <vector>
 
 #include "a_header.h"
+
+int here_is_some_code();
 EOF
 )
 assert_file_content "${TMPDIR}/new_block_c.cc" "${EXPECTED_TEST10}"
@@ -244,6 +248,8 @@ cat <<'EOF' > "${TMPDIR}/new_block_quote.cc"
 #include <stdio.h>
 
 #include <vector>
+
+int here_is_some_code();
 EOF
 
 "${INSERT_HEADER}" 'b_header.h' "${TMPDIR}/new_block_quote.cc"
@@ -254,6 +260,8 @@ EXPECTED_TEST11=$(cat <<'EOF'
 #include <vector>
 
 #include "b_header.h"
+
+int here_is_some_code();
 EOF
 )
 assert_file_content "${TMPDIR}/new_block_quote.cc" "${EXPECTED_TEST11}"
@@ -261,6 +269,8 @@ assert_file_content "${TMPDIR}/new_block_quote.cc" "${EXPECTED_TEST11}"
 echo "Test: Create new quote block when only an own header exists"
 cat <<'EOF' > "${TMPDIR}/own_only.cc"
 #include "own_only.h"
+
+int here_is_some_code();
 EOF
 
 "${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/own_only.cc"
@@ -269,8 +279,41 @@ EXPECTED_TEST12=$(cat <<'EOF'
 #include "own_only.h"
 
 #include "a_header.h"
+
+int here_is_some_code();
 EOF
 )
 assert_file_content "${TMPDIR}/own_only.cc" "${EXPECTED_TEST12}"
+
+echo "Test: Insert header at the beginning of a file"
+cat <<'EOF' > "${TMPDIR}/bar.cc"
+
+int here_is_some_code();
+EOF
+
+"${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar.cc"
+
+EXPECTED_TEST13=$(cat <<'EOF'
+#include "a_header.h"
+
+int here_is_some_code();
+EOF
+)
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
+
+echo "Test: Insert header at the beginning of a file, no pre-existing empty line"
+cat <<'EOF' > "${TMPDIR}/bar.cc"
+int here_is_some_code();
+EOF
+
+"${INSERT_HEADER}" 'a_header.h' "${TMPDIR}/bar.cc"
+
+EXPECTED_TEST13=$(cat <<'EOF'
+#include "a_header.h"
+
+int here_is_some_code();
+EOF
+)
+assert_file_content "${TMPDIR}/bar.cc" "${EXPECTED_TEST13}"
 
 echo "ALL insert-header tests PASSED!"

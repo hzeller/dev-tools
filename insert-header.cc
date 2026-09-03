@@ -218,17 +218,38 @@ static bool ModifyFile(const std::string &file_to_modify,
       include_block.push_back(line);
       current_block_type = line_type;
     } else {
+      if (!inserted && !matching_block_exists && !higher_rank_block_exists &&
+          !IsBlankLine(line)) {
+        if (first_include_seen) {
+          flush_includes();
+          emit_new_target_block(/*followed_by_include=*/false);
+          written += fwrite("\n", 1, 1, tmp_out);
+        } else {
+          fseek(tmp_out, insert_mark, SEEK_SET);
+          written = insert_mark;
+          written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+          written += fwrite("\n", 1, 1, tmp_out);
+          inserted = true;
+        }
+      }
       flush_includes();
       written += fwrite(line.data(), 1, line.size(), tmp_out);
-      if (line == "\n" || line == "\r\n") {
+      if (IsBlankLine(line)) {
         last_flushed_had_includes = false;
       }
     }
   }
 
   if (!inserted) {
-    flush_includes();
-    emit_new_target_block(/*followed_by_include=*/false);
+    if (!first_include_seen) {
+      fseek(tmp_out, insert_mark, SEEK_SET);
+      written = insert_mark;
+      written += fwrite(line_to_insert.data(), 1, line_to_insert.size(), tmp_out);
+      inserted = true;
+    } else {
+      flush_includes();
+      emit_new_target_block(/*followed_by_include=*/false);
+    }
   } else {
     flush_includes();
   }
